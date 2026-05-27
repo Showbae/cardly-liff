@@ -4,6 +4,13 @@ This file provides guidance to Claude Code when working with this project.
 
 ---
 
+## 📚 Product Documentation
+
+> **อ่านไฟล์นี้ก่อนทุกครั้งที่มีคำถามเกี่ยวกับ product, feature, segment, หรือ roadmap:**
+> **`docs/product-strategy.md`** — Product Vision, Customer Segments (7 กลุ่ม), Master Backlog (22 features, 337 SP), และ Roadmap แบ่งเป็น 5 Phase
+
+---
+
 ## Project Overview
 
 A LINE-integrated web application built with Next.js, featuring a LIFF frontend, serverless API backend on Vercel, and Supabase as the primary database.
