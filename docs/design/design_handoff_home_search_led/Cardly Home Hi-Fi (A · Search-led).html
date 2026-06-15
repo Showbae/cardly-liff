@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Cardly · Home Hi-Fi (A · Search-led)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hi-fi.css">
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="HiFiShell.jsx"></script>
+<script type="text/babel" src="HomeHiFi.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme":  "light",
+  "font":   "IBM Plex Sans Thai",
+  "density": "regular",
+  "showNotes": true,
+  "brand": "#0f8e5a"
+}/*EDITMODE-END*/;
+
+function Note({ label, children }) {
+  return (
+    <div className="artboard-note">
+      <span className="label">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function hexToRgb(h){ const n = parseInt(h.replace('#',''),16); return [n>>16&255, n>>8&255, n&255]; }
+function rgbToHex(r,g,b){ return '#' + [r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+function shade(h, amt){ const [r,g,b] = hexToRgb(h); const f = 1 + amt; return rgbToHex(r*f, g*f, b*f); }
+function tint(h, amt){ const [r,g,b] = hexToRgb(h); return rgbToHex(r + (255-r)*amt, g + (255-g)*amt, b + (255-b)*amt); }
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = t.theme;
+    document.documentElement.dataset.density = t.density;
+    document.documentElement.style.setProperty('--font-sans', `'${t.font}', system-ui, sans-serif`);
+    const root = document.documentElement.style;
+    root.setProperty('--brand-600', t.brand);
+    root.setProperty('--brand-700', shade(t.brand, -.18));
+    root.setProperty('--brand-900', shade(t.brand, -.45));
+    root.setProperty('--brand-500', shade(t.brand,  .12));
+    root.setProperty('--brand-100', tint(t.brand,  .85));
+    root.setProperty('--brand-50',  tint(t.brand,  .92));
+  }, [t.theme, t.density, t.font, t.brand]);
+
+  const Wrap = ({ children, note }) => (
+    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+      {children}
+      {t.showNotes && note}
+    </div>
+  );
+
+  return (
+    <>
+      <DesignCanvas title="Cardly · Home Hi-Fi" subtitle="แบบ A · Search-led — ลงรายละเอียดจริงด้วย design system เดียวกับ Wallet Hi-Fi">
+
+        <DCSection id="search-led" title="A · Search-led" subtitle="ค้นหานำ — หน้าหลัก + flow ผลการค้นหา (หัวใจของแบบ A คือ ค้นแล้วได้คำตอบ)">
+          <DCArtboard id="home-search" label="หน้าหลัก (search-led)" width={400} height={1180}>
+            <Wrap note={<Note label="หน้าหลัก — ค้นหาคือพระเอก">
+              ช่องค้นหาเด่นบนสุด (+ ปุ่มสแกน QR) → ใต้ลงมาเป็นหมวดให้กดเลือก + ค้นหาล่าสุด · โซน “ต้องรีบ” (โปรใกล้หมด / ครบเพดาน / ใกล้ครบขั้นต่ำ) · pill บัตรของฉัน · ใต้เส้นพับคือ Savings (Phase 2) + Feed (Phase 3–4)
+            </Note>}>
+              <HomeSearchLedHF style={{height: 'auto'}}/>
+            </Wrap>
+          </DCArtboard>
+
+          <DCArtboard id="home-result" label="ผลการค้นหา (พิมพ์ “Starbucks”)" width={400} height={840}>
+            <Wrap note={<Note label="ผลการค้นหา — คำตอบเดียวเด่น + เทียบใบอื่น">
+              พิมพ์ชื่อร้าน → การ์ดคำตอบใหญ่ “ใช้ KBANK Journey · คืน ฿45 (15%)” + ปุ่ม “ใช้ใบนี้” + เหตุผล (x10 แต้ม / ยังไม่ชนเพดาน / ถึงเมื่อไหร่) · ด้านล่างจัดอันดับใบอื่นพร้อมบอกว่าได้น้อยกว่ากี่บาท → ลดทอนให้เหลือ “คำตอบเดียว” ตาม insight
+            </Note>}>
+              <HomeSearchResultHF style={{height: 800}}/>
+            </Wrap>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Theme"/>
+        <TweakRadio label="Mode" value={t.theme}
+          options={['light', 'dark']}
+          onChange={(v) => setTweak('theme', v)}/>
+        <TweakColor label="Brand color" value={t.brand}
+          options={['#0f8e5a', '#16a974', '#2f6bd9', '#7a3fc9', '#c98e1f', '#0f1f18']}
+          onChange={(v) => setTweak('brand', v)}/>
+
+        <TweakSection label="Type"/>
+        <TweakSelect label="Font" value={t.font}
+          options={['IBM Plex Sans Thai', 'Sarabun', 'Noto Sans Thai']}
+          onChange={(v) => setTweak('font', v)}/>
+
+        <TweakSection label="Layout"/>
+        <TweakRadio label="Density" value={t.density}
+          options={['compact', 'regular', 'cozy']}
+          onChange={(v) => setTweak('density', v)}/>
+        <TweakToggle label="Show notes" value={t.showNotes}
+          onChange={(v) => setTweak('showNotes', v)}/>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
