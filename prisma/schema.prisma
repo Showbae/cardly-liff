@@ -17,6 +17,7 @@ model banks {
   updated_date DateTime?      @db.Date
   updated_by   String         @db.VarChar
   credit_cards credit_cards[]
+  promotions   promotions[]
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -46,6 +47,7 @@ model credit_cards {
   updated_by        String?             @db.VarChar
   card_base_benefit card_base_benefit[]
   banks             banks?              @relation(fields: [bank_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  promotion_cards   promotion_cards[]
   users_card        users_card[]
 }
 
@@ -82,7 +84,7 @@ model users {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users_card {
-  id           String        @id @db.Uuid
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id      String?       @db.Uuid
   card_id      String?       @db.Uuid
   created_date DateTime      @default(now()) @db.Timestamptz(6)
@@ -91,4 +93,101 @@ model users_card {
   updated_by   String?       @db.VarChar
   credit_cards credit_cards? @relation(fields: [card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users        users?        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model categories {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name_th      String?      @db.VarChar
+  name_eng     String?      @db.VarChar
+  icon         String?      @db.VarChar
+  sort_order   Int?
+  created_date DateTime     @default(now()) @db.Timestamptz(6)
+  created_by   String?      @db.VarChar
+  updated_date DateTime?    @db.Timestamptz(6)
+  updated_by   String?      @db.VarChar
+  merchants    merchants[]
+  promotions   promotions[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model merchants {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name_th             String?               @db.VarChar
+  name_eng            String?               @db.VarChar
+  logo_url            String?
+  category_id         String?               @db.Uuid
+  created_date        DateTime              @default(now()) @db.Timestamptz(6)
+  created_by          String?               @db.VarChar
+  updated_date        DateTime?             @db.Timestamptz(6)
+  updated_by          String?               @db.VarChar
+  categories          categories?           @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  promotion_merchants promotion_merchants[]
+
+  @@index([category_id], map: "idx_merchants_category")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model promotion_cards {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  promotion_id String       @db.Uuid
+  card_id      String       @db.Uuid
+  created_date DateTime     @default(now()) @db.Timestamptz(6)
+  created_by   String?      @db.VarChar
+  updated_date DateTime?    @db.Timestamptz(6)
+  updated_by   String?      @db.VarChar
+  credit_cards credit_cards @relation(fields: [card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  promotions   promotions   @relation(fields: [promotion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([promotion_id, card_id])
+  @@index([card_id], map: "idx_promo_cards_card")
+  @@index([promotion_id], map: "idx_promo_cards_promo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model promotion_merchants {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  promotion_id String     @db.Uuid
+  merchant_id  String     @db.Uuid
+  created_date DateTime   @default(now()) @db.Timestamptz(6)
+  created_by   String?    @db.VarChar
+  updated_date DateTime?  @db.Timestamptz(6)
+  updated_by   String?    @db.VarChar
+  merchants    merchants  @relation(fields: [merchant_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  promotions   promotions @relation(fields: [promotion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([promotion_id, merchant_id])
+  @@index([merchant_id], map: "idx_promo_merchants_merchant")
+  @@index([promotion_id], map: "idx_promo_merchants_promo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model promotions {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title               String                @db.VarChar
+  description         String?
+  promo_type          String?               @db.VarChar
+  benefit_value       Decimal?              @db.Decimal
+  benefit_unit        String?               @db.VarChar
+  min_spend           Decimal?              @db.Decimal
+  max_cap             Decimal?              @db.Decimal
+  category_id         String?               @db.Uuid
+  bank_id             String?               @db.VarChar
+  start_date          DateTime?             @db.Date
+  end_date            DateTime?             @db.Date
+  condition           String?
+  source_url          String?
+  status              String?               @default("draft") @db.VarChar
+  created_date        DateTime              @default(now()) @db.Timestamptz(6)
+  created_by          String?               @db.VarChar
+  updated_date        DateTime?             @db.Timestamptz(6)
+  updated_by          String?               @db.VarChar
+  promotion_cards     promotion_cards[]
+  promotion_merchants promotion_merchants[]
+  banks               banks?                @relation(fields: [bank_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categories          categories?           @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([bank_id], map: "idx_promotions_bank")
+  @@index([category_id], map: "idx_promotions_category")
+  @@index([status], map: "idx_promotions_status")
 }
