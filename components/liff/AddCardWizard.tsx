@@ -306,7 +306,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
 
   // ── Step 1 — เลือกธนาคาร ─────────────────────────────────
   if (step === 1) return (
-    <div className="fixed inset-0 z-50 bg-surface flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
       <AppBar title="เพิ่มบัตร" onBack={onClose} />
 
       <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
@@ -383,7 +383,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
   if (step === 2) {
     const canNext = form.last4.length === 4
     return (
-      <div className="fixed inset-0 z-50 bg-surface flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
         <AppBar title="เพิ่มบัตร" onBack={() => setStep(1)} />
 
         <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
@@ -481,7 +481,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
 
   // ── Step 3 — สิทธิ์ & รอบบัตร ────────────────────────────
   if (step === 3) return (
-    <div className="fixed inset-0 z-50 bg-surface flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
       <AppBar title="เพิ่มบัตร" onBack={() => setStep(2)} />
 
       <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
@@ -565,7 +565,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
 
   // ── Step 4 — สำเร็จ ───────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 bg-surface flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
       <div style={{ padding: '18px 16px 0', flexShrink: 0 }}>
         <StepDots step={4} />
       </div>
