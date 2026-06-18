@@ -7,7 +7,8 @@ export const initLiff = async () => {
 
 export const getLiffProfile = async () => {
   if (!liff.isLoggedIn()) {
-    liff.login()
+    // ใน LINE app → redirect login, ใน browser ปกติ → return null ไม่ redirect
+    if (liff.isInClient()) liff.login()
     return null
   }
   return liff.getProfile()

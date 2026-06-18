@@ -1,285 +1,247 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { initLiff, getLiffProfile } from '@/lib/liff'
 import { signInWithLine } from '@/lib/auth'
-import {
-  getCatalogCards,
-  getMyCards,
-  addCard,
-  removeCard,
-  type CreditCard,
-  type UserCard,
-} from '@/lib/cards'
+import { getMyCards } from '@/lib/cards'
 
-interface User {
-  id: string
-  display_name: string
-  picture_url: string
-}
+const CATEGORIES = [
+  { emoji: '☕', label: 'คาเฟ่' },
+  { emoji: '🍜', label: 'ร้านอาหาร' },
+  { emoji: '🛒', label: 'ซูเปอร์' },
+  { emoji: '⛽', label: 'น้ำมัน' },
+  { emoji: '🛍️', label: 'ช้อปปิ้ง' },
+  { emoji: '🏥', label: 'โรงพยาบาล' },
+]
 
-const TIER_COLOR: Record<string, string> = {
-  Infinite:  'from-gray-800 to-gray-600',
-  Prestige:  'from-gray-800 to-gray-600',
-  Signature: 'from-blue-900 to-blue-700',
-  Platinum:  'from-slate-600 to-slate-400',
-  Gold:      'from-yellow-700 to-yellow-500',
-}
+const RECENT_SEARCHES = ['Starbucks', 'PT Station', "Lotus's"]
 
-function tierColor(tier: string | null) {
-  return TIER_COLOR[tier ?? ''] ?? 'from-gray-500 to-gray-400'
-}
+const URGENCY_ALERTS = [
+  {
+    icon: '🔥',
+    iconBg: '#fdece1',
+    title: 'โปร KBank ลด 15% ใกล้หมด',
+    sub: 'ร้านในห้าง · ใช้ก่อนหมดสิทธิ์',
+    tag: 'เหลือ 2 วัน',
+    tagStyle: 'bg-warn-bg text-warn',
+  },
+  {
+    icon: '⚠️',
+    iconBg: '#e3edfb',
+    title: 'SCB M ใช้ครบเพดาน cashback แล้ว',
+    sub: 'รอบนี้สลับไปใช้ KTC Forever แทน',
+    tag: 'สลับใบ',
+    tagStyle: 'bg-brand-100 text-brand-700',
+  },
+  {
+    icon: '🎁',
+    iconBg: '#fbe9b6',
+    title: 'อีก ฿1,200 ครบขั้นต่ำรับของแถม',
+    sub: 'UOB Privi · รูดให้ถึง ฿15,000',
+    tag: '฿1,200',
+    tagStyle: 'bg-gold-100 text-gold-600',
+  },
+]
 
 export default function HomePage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [myCards, setMyCards] = useState<UserCard[]>([])
-  const [catalog, setCatalog] = useState<CreditCard[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [search, setSearch] = useState('')
-  const [adding, setAdding] = useState<string | null>(null)
-  const [removing, setRemoving] = useState<string | null>(null)
-
-  const loadMyCards = useCallback(async (userId: string) => {
-    const cards = await getMyCards(userId)
-    setMyCards(cards)
-  }, [])
+  const router = useRouter()
+  const [firstName, setFirstName] = useState('')
+  const [cardCount, setCardCount] = useState<number | null>(null)
+  const [authDone, setAuthDone] = useState(false)
 
   useEffect(() => {
     const init = async () => {
       try {
         await initLiff()
         const profile = await getLiffProfile()
-        if (!profile) return
-        const dbUser = await signInWithLine({
-          userId: profile.userId,
-          displayName: profile.displayName,
-          pictureUrl: profile.pictureUrl ?? '',
-        })
-        setUser(dbUser)
-        const [cards, cat] = await Promise.all([
-          getMyCards(dbUser.id),
-          getCatalogCards(),
-        ])
-        setMyCards(cards)
-        setCatalog(cat)
-      } catch (err) {
-        setError('เกิดข้อผิดพลาด: ' + String(err))
+
+        // Dev fallback: ใช้ Showbae account เมื่อไม่ได้อยู่ใน LINE
+        const dbUser = profile
+          ? await signInWithLine({
+              userId: profile.userId,
+              displayName: profile.displayName,
+              pictureUrl: profile.pictureUrl ?? '',
+            })
+          : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀' }
+
+        setFirstName(dbUser.display_name.split(' ')[0])
+        const cards = await getMyCards(dbUser.id)
+        setCardCount(cards.length)
+      } catch {
+        // fail silently on Home; Wallet page shows detailed errors
       } finally {
-        setIsLoading(false)
+        setAuthDone(true)
       }
     }
     init()
   }, [])
 
-  const handleAdd = async (cardId: string) => {
-    if (!user) return
-    setAdding(cardId)
-    try {
-      await addCard(user.id, cardId)
-      await loadMyCards(user.id)
-    } finally {
-      setAdding(null)
-    }
-  }
-
-  const handleRemove = async (userCardId: string) => {
-    if (!user) return
-    setRemoving(userCardId)
-    try {
-      await removeCard(userCardId)
-      setMyCards(prev => prev.filter(c => c.id !== userCardId))
-    } finally {
-      setRemoving(null)
-    }
-  }
-
-  const myCardIds = new Set(myCards.map(c => c.card_id))
-
-  const filteredCatalog = catalog.filter(c => {
-    const q = search.toLowerCase()
-    return (
-      c.card_name?.toLowerCase().includes(q) ||
-      c.banks?.name_th?.includes(q) ||
-      c.banks?.name_eng?.toLowerCase().includes(q)
-    )
-  })
-
-  // Group catalog by bank
-  const byBank = filteredCatalog.reduce<Record<string, CreditCard[]>>((acc, c) => {
-    const key = c.bank_id ?? 'อื่นๆ'
-    if (!acc[key]) acc[key] = []
-    acc[key].push(c)
-    return acc
-  }, {})
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">กำลังโหลด...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm max-w-sm w-full">
-          {error}
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white px-4 pt-10 pb-5 shadow-sm">
-        <div className="flex items-center gap-3">
-          {user?.picture_url && (
-            <img
-              src={user.picture_url}
-              alt="profile"
-              className="w-11 h-11 rounded-full object-cover"
-            />
-          )}
-          <div>
-            <p className="text-xs text-gray-400">สวัสดี</p>
-            <p className="font-semibold text-gray-800">{user?.display_name}</p>
-          </div>
+    <div className="min-h-screen bg-bg">
+
+      {/* ── App Header ────────────────────────────── */}
+      <div className="px-5 pt-10 pb-2 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink leading-tight">
+            วันนี้จะรูดที่ไหน?
+          </h1>
+          <p className="text-[12px] text-ink-3 mt-0.5 flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            ทองหล่อ
+            {firstName ? ` · สวัสดี, ${firstName}` : ''}
+          </p>
         </div>
-        <h1 className="mt-4 text-lg font-bold text-gray-900">กระเป๋าบัตรของฉัน</h1>
-        <p className="text-sm text-gray-400">{myCards.length} บัตร</p>
+        <button className="w-9 h-9 rounded-xl bg-surface border border-line flex items-center justify-center text-ink-2 relative shrink-0 mt-1 shadow-depth-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          <span className="absolute top-[7px] right-[8px] w-1.5 h-1.5 rounded-full bg-warn border border-surface" />
+        </button>
       </div>
 
-      {/* My Cards */}
-      <div className="px-4 mt-5 space-y-3">
-        {myCards.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <p className="text-4xl mb-3">💳</p>
-            <p className="text-sm">ยังไม่มีบัตร กด + เพื่อเพิ่มบัตร</p>
-          </div>
-        )}
-        {myCards.map(uc => {
-          const card = uc.credit_cards
-          const bank = card?.banks
-          return (
-            <div
-              key={uc.id}
-              className={`relative rounded-2xl bg-gradient-to-br ${tierColor(card?.card_tier ?? null)} text-white p-4 shadow-md`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs opacity-70">{bank?.name_th ?? bank?.name_eng}</p>
-                  <p className="font-semibold mt-0.5">{card?.card_name}</p>
-                  <span className="inline-block mt-2 text-xs bg-white/20 rounded-full px-2 py-0.5">
-                    {card?.card_tier}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleRemove(uc.id)}
-                  disabled={removing === uc.id}
-                  className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition"
-                >
-                  {removing === uc.id ? (
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <span className="text-sm leading-none">✕</span>
-                  )}
-                </button>
+      <div className="px-4 pb-6 space-y-0">
+
+        {/* ── Zone 1 · Search Hero ─────────────────── */}
+        <div
+          className="flex items-center gap-[11px] px-4 py-[15px] bg-surface border-[1.5px] border-line shadow-depth-md mt-3"
+          style={{ borderRadius: 'var(--r-lg)' }}
+        >
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--brand-700)"
+            strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span className="flex-1 text-[15px] text-ink-4">ค้นหาร้าน หมวด หรือธนาคาร</span>
+          <button
+            className="w-8 h-8 bg-brand-100 text-brand-700 flex items-center justify-center"
+            style={{ borderRadius: 'var(--r-xs)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </button>
+        </div>
+
+        &nbsp;
+
+        {/* Categories */}
+        <div className="flex gap-3 overflow-x-auto mt-[14px] pb-1 -mx-1 px-1 scrollbar-none">
+          {CATEGORIES.map(c => (
+            <button key={c.label} className="flex flex-col items-center gap-1.5 min-w-[58px]">
+              <div className="w-[52px] h-[52px] rounded-2xl bg-surface border border-line flex items-center justify-center text-[23px]">
+                {c.emoji}
               </div>
-              {/* Card chip */}
-              <div className="mt-4 w-8 h-6 rounded bg-yellow-300/60" />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* FAB */}
-      <button
-        onClick={() => setShowAddModal(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-green-500 text-white shadow-lg text-2xl flex items-center justify-center hover:bg-green-600 active:scale-95 transition"
-      >
-        +
-      </button>
-
-      {/* Add Card Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          {/* Modal header */}
-          <div className="flex items-center gap-3 px-4 pt-10 pb-3 border-b">
-            <button
-              onClick={() => { setShowAddModal(false); setSearch('') }}
-              className="text-gray-500 text-xl"
-            >
-              ←
+              <span className="text-[11px] text-ink-2 whitespace-nowrap">{c.label}</span>
             </button>
-            <h2 className="font-semibold text-gray-800 flex-1">เพิ่มบัตร</h2>
-          </div>
-
-          {/* Search */}
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อบัตรหรือธนาคาร..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-green-400"
-            />
-          </div>
-
-          {/* Catalog list */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
-            {Object.entries(byBank).map(([bankId, cards]) => {
-              const bankName = cards[0]?.banks?.name_th ?? cards[0]?.banks?.name_eng ?? bankId
-              return (
-                <div key={bankId}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                    {bankName}
-                  </p>
-                  <div className="space-y-2">
-                    {cards.map(card => {
-                      const owned = myCardIds.has(card.id)
-                      return (
-                        <div
-                          key={card.id}
-                          className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm"
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{card.card_name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{card.card_tier}</p>
-                          </div>
-                          <button
-                            onClick={() => !owned && handleAdd(card.id)}
-                            disabled={owned || adding === card.id}
-                            className={`min-w-[64px] text-sm rounded-full px-3 py-1.5 font-medium transition ${
-                              owned
-                                ? 'bg-gray-100 text-gray-400 cursor-default'
-                                : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'
-                            }`}
-                          >
-                            {adding === card.id ? (
-                              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : owned ? (
-                              'มีแล้ว'
-                            ) : (
-                              'เพิ่ม'
-                            )}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          ))}
         </div>
-      )}
+
+        {/* Recent searches */}
+        <div className="flex items-center gap-1.5 mt-[14px] flex-wrap">
+          <span className="text-[11px] text-ink-4">ล่าสุด</span>
+          {RECENT_SEARCHES.map(q => (
+            <button
+              key={q}
+              className="inline-flex items-center gap-1 text-[12px] font-medium px-[11px] py-[5px] rounded-full bg-surface-2 text-ink-2"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {q}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Zone 2 · ต้องรีบ ─────────────────────── */}
+        <div className="flex justify-between items-center mt-[18px] mb-2 mx-0.5">
+          <h3 className="text-[13px] font-semibold text-ink">ต้องรีบ</h3>
+          <button className="text-[12px] text-brand-700">ดูทั้งหมด</button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {URGENCY_ALERTS.map((item, i) => (
+            <div
+              key={i}
+              className="grid gap-3 items-center px-3 py-[10px] bg-surface border border-line"
+              style={{ gridTemplateColumns: '40px 1fr auto', borderRadius: 'var(--r-md)' }}
+            >
+              <div
+                className="w-10 h-10 flex items-center justify-center text-[19px]"
+                style={{ background: item.iconBg, borderRadius: 12 }}
+              >
+                {item.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-ink leading-snug">{item.title}</p>
+                <p className="text-[11px] text-ink-3 mt-0.5">{item.sub}</p>
+              </div>
+              <span className={`inline-flex text-[11px] font-medium px-[9px] py-[5px] rounded-full whitespace-nowrap ${item.tagStyle}`}>
+                {item.tag}
+              </span>
+            </div>
+          ))}
+        </div>
+         &nbsp;
+        {/* ── Zone 3 · บัตรของฉัน pill ─────────────── */}
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => router.push('/wallet')}
+            className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-surface border border-line shadow-depth-sm"
+          >
+            {/* mini card stack */}
+            <div className="relative w-[38px] h-6 shrink-0">
+              <div
+                className="absolute left-0 top-[3px] w-[26px] h-[17px]"
+                style={{
+                  borderRadius: 4,
+                  background: 'linear-gradient(135deg, #6b2d8c 0%, #341252 100%)',
+                  transform: 'rotate(-12deg)',
+                }}
+              />
+              <div
+                className="absolute left-[6px] top-[2px] w-[26px] h-[17px]"
+                style={{
+                  borderRadius: 4,
+                  background: 'linear-gradient(135deg, #e3603f 0%, #a02b1f 100%)',
+                  transform: 'rotate(-3deg)',
+                }}
+              />
+              <div
+                className="absolute left-[12px] top-[1px] w-[26px] h-[17px]"
+                style={{
+                  borderRadius: 4,
+                  background: 'linear-gradient(135deg, #1c8c75 0%, #07332a 100%)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,.25)',
+                }}
+              />
+            </div>
+           
+            <span className="text-[12px] font-semibold text-ink">
+              {!authDone
+                ? 'บัตรของฉัน'
+                : `บัตรของฉัน · ${cardCount ?? 0} ใบ`}
+            </span>
+
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)"
+              strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+
+      </div>
     </div>
   )
 }
