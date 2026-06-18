@@ -3,14 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { initLiff, getLiffProfile } from '@/lib/liff'
 import { signInWithLine } from '@/lib/auth'
-import {
-  getCatalogCards,
-  getMyCards,
-  addCard,
-  removeCard,
-  type CreditCard,
-  type UserCard,
-} from '@/lib/cards'
+import { getMyCards, removeCard, type UserCard } from '@/lib/cards'
+import { AddCardWizard } from '@/components/liff/AddCardWizard'
 
 interface User {
   id: string
@@ -43,57 +37,69 @@ const BANK_INITIAL: Record<string, string> = {
 function cardGradient(bankId?: string | null) {
   return BANK_GRADIENT[bankId ?? ''] ?? 'linear-gradient(135deg, #2a3a33, #0c1612)'
 }
-
 function bankInitial(bankId?: string | null) {
   return BANK_INITIAL[bankId ?? ''] ?? (bankId?.charAt(0) ?? '?')
 }
-
 function bankColor(bankId?: string | null) {
   return BANK_COLOR[bankId ?? ''] ?? '#2a3a33'
 }
 
 // ── Featured card visual ─────────────────────────────────────
-function FeaturedCard({ uc }: { uc: UserCard }) {
+function FeaturedCard({ uc, onRemove, removing }: {
+  uc: UserCard
+  onRemove: (id: string) => void
+  removing: boolean
+}) {
   const card = uc.credit_cards
   const bank = card?.banks
   const bankName = bank?.name_th ?? bank?.name_eng ?? card?.bank_id ?? ''
 
   return (
-    <div
-      className="w-full text-white mt-2"
-      style={{
-        aspectRatio: '1.586 / 1',
-        borderRadius: 'var(--r-card)',
-        background: cardGradient(card?.bank_id),
-        boxShadow: 'var(--shadow-card)',
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-      }}
-    >
-      {/* Top row: bank name + network */}
+    <div className="w-full text-white mt-2 relative" style={{
+      aspectRatio: '1.586 / 1',
+      borderRadius: 'var(--r-card)',
+      background: cardGradient(card?.bank_id),
+      boxShadow: 'var(--shadow-card)',
+      padding: '18px 20px',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    }}>
       <div className="flex justify-between items-start">
-        <div className="text-[11px] font-semibold tracking-[0.8px] opacity-80 uppercase">{bankName}</div>
-        <div className="text-[11px] font-bold tracking-[1px] opacity-70 uppercase">VISA</div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.8px', opacity: .8, textTransform: 'uppercase' }}>
+          {bankName}
+        </div>
+        <button
+          onClick={() => onRemove(uc.id)}
+          disabled={removing}
+          style={{
+            width: 24, height: 24, borderRadius: 999,
+            background: 'rgba(255,255,255,.2)', border: 'none',
+            color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center',
+          }}
+        >
+          {removing
+            ? <span style={{ width: 10, height: 10, borderRadius: 999, border: '2px solid #fff', borderTopColor: 'transparent', display: 'inline-block', animation: 'spin 1s linear infinite' }} />
+            : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          }
+        </button>
       </div>
-      {/* Chip */}
-      <div
-        style={{
-          width: 30, height: 22, borderRadius: 4,
-          background: 'linear-gradient(135deg, #e8d97e, #c9a84c)',
-          border: '1px solid rgba(255,255,255,.2)',
-        }}
-      />
-      {/* Bottom row */}
+
+      <div style={{ width: 30, height: 22, borderRadius: 4, background: 'linear-gradient(135deg, #e8d97e, #c9a84c)', border: '1px solid rgba(255,255,255,.2)' }} />
+
       <div>
-        <div className="font-mono text-[14px] tracking-[2px] opacity-85">•••• •••• •••• ••••</div>
+        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 14, letterSpacing: 2, opacity: .85 }}>
+          •••• •••• •••• ••••
+        </div>
         <div className="flex justify-between items-end mt-1.5">
           <div>
-            <div className="text-[13px] font-semibold tracking-tight leading-snug">{card?.card_name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-.2px' }}>{card?.card_name}</div>
             {card?.card_tier && (
-              <div className="text-[10px] opacity-60 uppercase tracking-[0.6px] mt-0.5">{card.card_tier}</div>
+              <div style={{ fontSize: 10, opacity: .6, textTransform: 'uppercase', letterSpacing: '.6px', marginTop: 2 }}>
+                {card.card_tier}
+              </div>
             )}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, opacity: .7, textTransform: 'uppercase' }}>
+            VISA
           </div>
         </div>
       </div>
@@ -104,12 +110,9 @@ function FeaturedCard({ uc }: { uc: UserCard }) {
 export default function WalletPage() {
   const [user, setUser] = useState<User | null>(null)
   const [myCards, setMyCards] = useState<UserCard[]>([])
-  const [catalog, setCatalog] = useState<CreditCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [search, setSearch] = useState('')
-  const [adding, setAdding] = useState<string | null>(null)
+  const [showWizard, setShowWizard] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
 
   const loadMyCards = useCallback(async (userId: string) => {
@@ -133,9 +136,7 @@ export default function WalletPage() {
           : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀', picture_url: '' }
 
         setUser(dbUser)
-        const [cards, cat] = await Promise.all([getMyCards(dbUser.id), getCatalogCards()])
-        setMyCards(cards)
-        setCatalog(cat)
+        await loadMyCards(dbUser.id)
       } catch (err) {
         setError('เกิดข้อผิดพลาด: ' + String(err))
       } finally {
@@ -143,18 +144,7 @@ export default function WalletPage() {
       }
     }
     init()
-  }, [])
-
-  const handleAdd = async (cardId: string) => {
-    if (!user) return
-    setAdding(cardId)
-    try {
-      await addCard(user.id, cardId)
-      await loadMyCards(user.id)
-    } finally {
-      setAdding(null)
-    }
-  }
+  }, [loadMyCards])
 
   const handleRemove = async (userCardId: string) => {
     if (!user) return
@@ -166,24 +156,6 @@ export default function WalletPage() {
       setRemoving(null)
     }
   }
-
-  const myCardIds = new Set(myCards.map(c => c.card_id))
-
-  const filteredCatalog = catalog.filter(c => {
-    const q = search.toLowerCase()
-    return (
-      c.card_name?.toLowerCase().includes(q) ||
-      c.banks?.name_th?.includes(q) ||
-      c.banks?.name_eng?.toLowerCase().includes(q)
-    )
-  })
-
-  const byBank = filteredCatalog.reduce<Record<string, CreditCard[]>>((acc, c) => {
-    const key = c.bank_id ?? 'อื่นๆ'
-    if (!acc[key]) acc[key] = []
-    acc[key].push(c)
-    return acc
-  }, {})
 
   if (isLoading) {
     return (
@@ -238,7 +210,11 @@ export default function WalletPage() {
         {/* ── Featured Card ──────────────────────── */}
         {featured ? (
           <>
-            <FeaturedCard uc={featured} />
+            <FeaturedCard
+              uc={featured}
+              onRemove={handleRemove}
+              removing={removing === featured.id}
+            />
 
             {/* Section caption */}
             <div className="flex justify-between items-center mt-[14px] mb-1 mx-0.5">
@@ -274,16 +250,23 @@ export default function WalletPage() {
                         {bankName} · ••••
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-[11px] font-semibold text-ink-2">{card?.card_tier}</div>
-                    </div>
+                    <button
+                      onClick={() => handleRemove(uc.id)}
+                      disabled={removing === uc.id}
+                      className="w-6 h-6 flex items-center justify-center text-ink-4 shrink-0"
+                      style={{ borderRadius: 999, background: 'var(--surface-2)', border: 'none', cursor: 'pointer' }}
+                    >
+                      {removing === uc.id
+                        ? <span className="w-3 h-3 border-2 border-ink-4 border-t-transparent rounded-full animate-spin" />
+                        : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      }
+                    </button>
                   </div>
                 )
               })}
             </div>
           </>
         ) : (
-          /* Empty state */
           <div className="text-center py-14 text-ink-4">
             <div className="text-4xl mb-3">💳</div>
             <p className="text-sm">ยังไม่มีบัตร กดเพิ่มบัตรด้านล่าง</p>
@@ -292,7 +275,7 @@ export default function WalletPage() {
 
         {/* ── Add Card button ─────────────────────── */}
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => setShowWizard(true)}
           className="w-full mt-[18px] flex items-center justify-center gap-2 text-[14px] font-semibold py-[13px]"
           style={{ borderRadius: 999, background: 'var(--ink)', color: 'var(--bg)' }}
         >
@@ -304,95 +287,16 @@ export default function WalletPage() {
         </button>
       </div>
 
-      {/* ── Add Card Modal ─────────────────────────── */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-surface">
-          <div className="flex items-center gap-3 px-5 pt-10 pb-3 border-b border-line">
-            <button
-              onClick={() => { setShowAddModal(false); setSearch('') }}
-              className="text-ink-3 text-xl leading-none"
-            >
-              ←
-            </button>
-            <h2 className="font-semibold text-ink flex-1">เพิ่มบัตร</h2>
-          </div>
-          <div className="px-4 py-3 border-b border-line bg-bg">
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อบัตรหรือธนาคาร..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-500"
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
-            {Object.entries(byBank).map(([bankId, cards]) => {
-              const bankName = cards[0]?.banks?.name_th ?? cards[0]?.banks?.name_eng ?? bankId
-              return (
-                <div key={bankId}>
-                  <p className="text-xs font-semibold text-ink-4 uppercase tracking-wide mb-2">
-                    {bankName}
-                  </p>
-                  <div className="space-y-2">
-                    {cards.map(card => {
-                      const owned = myCardIds.has(card.id)
-                      return (
-                        <div key={card.id}
-                          className="flex items-center justify-between bg-surface border border-line rounded-xl px-4 py-3 shadow-depth-sm">
-                          <div>
-                            <p className="text-sm font-medium text-ink">{card.card_name}</p>
-                            <p className="text-xs text-ink-4 mt-0.5">{card.card_tier}</p>
-                          </div>
-                          <button
-                            onClick={() => !owned && handleAdd(card.id)}
-                            disabled={owned || adding === card.id}
-                            className={`min-w-[64px] text-sm rounded-full px-3 py-1.5 font-medium transition ${
-                              owned
-                                ? 'bg-surface-2 text-ink-4 cursor-default'
-                                : 'bg-brand-700 text-white hover:bg-brand-600 active:scale-95'
-                            }`}
-                          >
-                            {adding === card.id ? (
-                              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : owned ? 'มีแล้ว' : 'เพิ่ม'}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-            {/* Remove card option (long-press simulation) */}
-            {myCards.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-ink-4 uppercase tracking-wide mb-2">
-                  จัดการบัตร
-                </p>
-                <div className="space-y-2">
-                  {myCards.map(uc => (
-                    <div key={uc.id}
-                      className="flex items-center justify-between bg-surface border border-line rounded-xl px-4 py-3 shadow-depth-sm">
-                      <div>
-                        <p className="text-sm font-medium text-ink">{uc.credit_cards?.card_name}</p>
-                        <p className="text-xs text-ink-4 mt-0.5">{uc.credit_cards?.card_tier}</p>
-                      </div>
-                      <button
-                        onClick={() => handleRemove(uc.id)}
-                        disabled={removing === uc.id}
-                        className="min-w-[64px] text-sm rounded-full px-3 py-1.5 font-medium transition bg-warn-bg text-warn"
-                      >
-                        {removing === uc.id ? (
-                          <span className="inline-block w-4 h-4 border-2 border-warn border-t-transparent rounded-full animate-spin" />
-                        ) : 'ลบ'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ── Add Card Wizard ─────────────────────── */}
+      {showWizard && (
+        <AddCardWizard
+          onClose={() => setShowWizard(false)}
+          onComplete={() => {
+            setShowWizard(false)
+            // TODO M2: reload after real card save API
+            if (user) loadMyCards(user.id)
+          }}
+        />
       )}
     </div>
   )
