@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Cardly · Editorial Home + Add Journey</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hi-fi.css">
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="HiFiShell.jsx"></script>
+<script type="text/babel" src="CardManageShell.jsx"></script>
+<script type="text/babel" src="CardChain.jsx"></script>
+<script type="text/babel" src="CardJourney.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme":  "light",
+  "font":   "IBM Plex Sans Thai",
+  "density": "regular",
+  "showNotes": true,
+  "brand": "#0f8e5a"
+}/*EDITMODE-END*/;
+
+function Note({ label, children }) {
+  return (<div className="artboard-note"><span className="label">{label}</span>{children}</div>);
+}
+
+function hexToRgb(h){ const n = parseInt(h.replace('#',''),16); return [n>>16&255, n>>8&255, n&255]; }
+function rgbToHex(r,g,b){ return '#' + [r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+function shade(h, amt){ const [r,g,b] = hexToRgb(h); const f = 1 + amt; return rgbToHex(r*f, g*f, b*f); }
+function tint(h, amt){ const [r,g,b] = hexToRgb(h); return rgbToHex(r + (255-r)*amt, g + (255-g)*amt, b + (255-b)*amt); }
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = t.theme;
+    document.documentElement.dataset.density = t.density;
+    document.documentElement.style.setProperty('--font-sans', `'${t.font}', system-ui, sans-serif`);
+    const root = document.documentElement.style;
+    root.setProperty('--brand-600', t.brand);
+    root.setProperty('--brand-700', shade(t.brand, -.18));
+    root.setProperty('--brand-900', shade(t.brand, -.45));
+    root.setProperty('--brand-500', shade(t.brand,  .12));
+    root.setProperty('--brand-100', tint(t.brand,  .85));
+    root.setProperty('--brand-50',  tint(t.brand,  .92));
+  }, [t.theme, t.density, t.font, t.brand]);
+
+  const Wrap = ({ children, note }) => (
+    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+      {children}
+      {t.showNotes && note}
+    </div>
+  );
+
+  const board = (id, label, comp, note) => (
+    <DCArtboard id={id} label={label} width={400} height={860}>
+      <Wrap note={<Note label={note.label}>{note.body}</Note>}>{comp}</Wrap>
+    </DCArtboard>
+  );
+
+  return (
+    <>
+      <DesignCanvas title="Cardly · หน้าหลัก + Journey เพิ่มบัตร" subtitle="หน้าหลัก = แบบ 4 (Editorial) · เพิ่มบัตร = Journey ทีละสเต็ป (แบบ 3) + พรีวิวสด (แบบ 2)">
+
+        <DCSection id="home" title="หน้าหลัก · Editorial (แบบ 4)" subtitle="จุดเริ่ม — แตะ ‘เพิ่มบัตร’ เพื่อเข้าสู่ Journey">
+          {board('home', 'หน้าหลักบัตร', <EditorialHome/>, {
+            label: 'หน้าหลัก: editorial',
+            body: 'โปร่ง ตัวเลขใหญ่ "5 ใบ" · บัตรเด่น 1 ใบ + รายการเส้นบาง · ปุ่ม "เพิ่มบัตร" ทรง pill สีหมึก → เข้าสู่ Journey',
+          })}
+        </DCSection>
+
+        <DCSection id="journey" title="เพิ่มบัตร · Journey (แบบ 3 + 2)" subtitle="4 สเต็ปเรียงตามลำดับ — เลือกธนาคาร → รายละเอียด+พรีวิว → สิทธิ์ → สำเร็จ">
+          {board('j1', 'สเต็ป 1 · เลือกธนาคาร', <JStep1Bank/>, {
+            label: 'สเต็ป 1/4',
+            body: 'progress dots + ค้นหา + รายการธนาคาร เลือก KBANK · โครงจากแบบ 3 (wizard) ลดความผิดพลาดเรื่อง issuer',
+          })}
+          {board('j2', 'สเต็ป 2 · รายละเอียด + พรีวิว', <JStep2Details/>, {
+            label: 'สเต็ป 2/4 · merge 2+3',
+            body: 'บัตรพรีวิวสดด้านบน (จากแบบ 2) อัปเดตตามที่กรอก + ฟิลด์ชื่อบัตร/4 ตัวท้าย/เครือข่าย/สี · เห็นผลทันที',
+          })}
+          {board('j3', 'สเต็ป 3 · สิทธิ์ & รอบบัตร', <JStep3Rewards/>, {
+            label: 'สเต็ป 3/4',
+            body: 'ประเภทสิทธิ์ + อัตรา + วันสรุป/ครบกำหนด + วงเงิน · มีแถบบัตรย่อคงไว้เพื่อความต่อเนื่อง · ปุ่ม "เพิ่มบัตร"',
+          })}
+          {board('j4', 'สเต็ป 4 · สำเร็จ', <JStep4Done/>, {
+            label: 'สเต็ป 4/4',
+            body: 'ยืนยันสำเร็จ + บัตรที่เพิ่ง add · ไป "ดูบัตรในกระเป๋า" (กลับหน้าหลัก) หรือ "เพิ่มอีกใบ"',
+          })}
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Theme"/>
+        <TweakRadio label="Mode" value={t.theme} options={['light', 'dark']} onChange={(v) => setTweak('theme', v)}/>
+        <TweakColor label="Brand color" value={t.brand}
+          options={['#0f8e5a', '#16a974', '#2f6bd9', '#7a3fc9', '#c98e1f', '#0f1f18']}
+          onChange={(v) => setTweak('brand', v)}/>
+
+        <TweakSection label="Type"/>
+        <TweakSelect label="Font" value={t.font} options={['IBM Plex Sans Thai', 'Sarabun', 'Noto Sans Thai']} onChange={(v) => setTweak('font', v)}/>
+
+        <TweakSection label="Layout"/>
+        <TweakRadio label="Density" value={t.density} options={['compact', 'regular', 'cozy']} onChange={(v) => setTweak('density', v)}/>
+        <TweakToggle label="Show notes" value={t.showNotes} onChange={(v) => setTweak('showNotes', v)}/>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
