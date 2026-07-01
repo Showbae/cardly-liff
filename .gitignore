@@ -26,3 +26,9 @@ yarn-debug.log*
 yarn-error.log*
 .vercel
 .env*
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Claude Code
+.claude/
