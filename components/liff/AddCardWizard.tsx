@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────
 type Network = 'visa' | 'mastercard' | 'jcb' | 'amex' | 'unionpay'
-type RewardType = 'cashback' | 'miles' | 'points'
 
 interface WizardForm {
   bankId: string
@@ -16,14 +15,13 @@ interface WizardForm {
   expiryDate: string
   network: Network | ''
   colorVariant: string
-  rewardType: RewardType
-  rate: string
   statementDay: string
   dueDay: string
   creditLimit: string
 }
 
 export interface AddCardWizardProps {
+  userId: string
   onClose: () => void
   onComplete: () => void
 }
@@ -61,17 +59,10 @@ function inferNetwork(cardName: string, bankId: string): Network {
   return 'visa'
 }
 
-const REWARD_ITEMS: Array<{ id: RewardType; label: string; emoji: string }> = [
-  { id: 'cashback', label: 'Cashback', emoji: '🎁' },
-  { id: 'miles',    label: 'ไมล์',     emoji: '✈️' },
-  { id: 'points',   label: 'พอยต์',   emoji: '⭐' },
-]
-
 const INITIAL_FORM: WizardForm = {
   bankId: '', bankName: '', bankColor: '',
   cardId: '', productName: '', last4: '', expiryDate: '',
   network: '', colorVariant: 'kbank',
-  rewardType: 'cashback', rate: '1',
   statementDay: '5', dueDay: '25', creditLimit: '',
 }
 
@@ -172,12 +163,13 @@ function PrimaryBtn({ children, icon, onClick, disabled }: {
   )
 }
 
-function GhostBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+function GhostBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} disabled={disabled} style={{
       flexShrink: 0, width: 96, padding: '11px 18px', borderRadius: 13,
       border: '1.5px solid var(--line)', background: 'transparent',
-      color: 'var(--ink-2)', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+      color: disabled ? 'var(--ink-4)' : 'var(--ink-2)',
+      fontSize: 14, fontWeight: 600, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
     }}>
       {children}
     </button>
@@ -290,13 +282,34 @@ function SectionLabel({ label, hint }: { label: string; hint?: string }) {
 // ── Wizard ────────────────────────────────────────────────────
 interface BankItem { id: string; name: string; color: string; initial: string }
 
-export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
+export function AddCardWizard({ userId, onClose, onComplete }: AddCardWizardProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [form, setForm] = useState<WizardForm>(INITIAL_FORM)
   const [searchBank, setSearchBank] = useState('')
   const [banks, setBanks] = useState<BankItem[]>([])
   const [creditCards, setCreditCards] = useState<{ id: string; card_name: string | null; card_tier: string | null }[]>([])
   const [showCardPicker, setShowCardPicker] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const saveAndFinish = async () => {
+    if (!form.cardId || isSaving) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch('/api/cards/my', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, cardId: form.cardId }),
+      })
+      if (!res.ok) throw new Error()
+      setStep(4)
+    } catch {
+      setSaveError('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!form.bankId) return
@@ -537,12 +550,16 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
         </div>
 
         <Footer>
+          {saveError && (
+            <div style={{ fontSize: 12, color: 'var(--warn)', textAlign: 'center', marginBottom: 8 }}>
+              {saveError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
-            <GhostBtn onClick={() => {
-              setForm(f => ({ ...f, cardId: '', productName: '', network: '' }))
-              setStep(1)
-            }}>ย้อนกลับ</GhostBtn>
-            <PrimaryBtn icon="next" onClick={() => setStep(3)} disabled={!canNext}>ถัดไป</PrimaryBtn>
+            <GhostBtn onClick={() => setStep(3)} disabled={!canNext}>ถัดไป</GhostBtn>
+            <PrimaryBtn icon="check" onClick={saveAndFinish} disabled={!form.cardId || isSaving}>
+              {isSaving ? 'กำลังบันทึก...' : 'เสร็จ'}
+            </PrimaryBtn>
           </div>
         </Footer>
 
@@ -670,7 +687,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
       <AppBar title="เพิ่มบัตร" onBack={() => setStep(2)} />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-2">
-        <StepHeader step={3} label="สิทธิ์ & รอบบัตร" />
+        <StepHeader step={3} label="รอบบัตร & วงเงิน" />
 
         {/* Continuity strip */}
         <div style={{
@@ -690,33 +707,6 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
             strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-        </div>
-
-        {/* Reward type */}
-        <div style={{ marginTop: 16 }}>
-          <SectionLabel label="ประเภทสิทธิประโยชน์" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
-              {REWARD_ITEMS.map(t => {
-                const sel = form.rewardType === t.id
-                return (
-                  <button key={t.id} onClick={() => set('rewardType', t.id)} style={{
-                    padding: '12px 4px', borderRadius: 12, textAlign: 'center',
-                    border: `1.5px solid ${sel ? 'var(--brand-600)' : 'var(--line)'}`,
-                    background: sel ? 'var(--brand-50)' : 'var(--surface)',
-                    color: sel ? 'var(--brand-700)' : 'var(--ink-3)',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}>
-                    <div style={{ fontSize: 20 }}>{t.emoji}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, marginTop: 5 }}>{t.label}</div>
-                  </button>
-                )
-              })}
-            </div>
-            <Field label="อัตรา" value={form.rate}
-              onChange={v => set('rate', v.replace(/[^\d.]/g, ''))}
-              suffix="% ทุกหมวด" placeholder="1" />
-          </div>
         </div>
 
         {/* Billing cycle */}
@@ -740,9 +730,15 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
       </div>
 
       <Footer>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <GhostBtn onClick={() => setStep(2)}>ย้อนกลับ</GhostBtn>
-          <PrimaryBtn icon="check" onClick={() => setStep(4)}>เพิ่มบัตร</PrimaryBtn>
+        {saveError && (
+          <div style={{ fontSize: 12, color: 'var(--warn)', textAlign: 'center', marginBottom: 8 }}>
+            {saveError}
+          </div>
+        )}
+        <div style={{ display: 'flex' }}>
+          <PrimaryBtn icon="check" onClick={saveAndFinish} disabled={!form.cardId || isSaving}>
+            {isSaving ? 'กำลังบันทึก...' : 'เพิ่มบัตร'}
+          </PrimaryBtn>
         </div>
       </Footer>
     </div>

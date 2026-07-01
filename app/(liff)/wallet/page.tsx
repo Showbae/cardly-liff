@@ -290,10 +290,10 @@ export default function WalletPage() {
       {/* ── Add Card Wizard ─────────────────────── */}
       {showWizard && (
         <AddCardWizard
+          userId={user?.id ?? ''}
           onClose={() => setShowWizard(false)}
           onComplete={() => {
             setShowWizard(false)
-            // TODO M2: reload after real card save API
             if (user) loadMyCards(user.id)
           }}
         />
