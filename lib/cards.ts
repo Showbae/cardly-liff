@@ -1,5 +1,3 @@
-import { createSupabaseClient } from './supabase/client'
-
 export interface Bank {
   id: string
   name_th: string | null
@@ -22,38 +20,29 @@ export interface UserCard {
 }
 
 export async function getCatalogCards(): Promise<CreditCard[]> {
-  const supabase = createSupabaseClient()
-  const { data, error } = await supabase
-    .from('credit_cards')
-    .select('*, banks(*)')
-    .order('bank_id')
-  if (error) throw error
-  return data ?? []
+  const res = await fetch('/api/cards/catalog')
+  if (!res.ok) throw new Error(`getCatalogCards failed: ${res.status}`)
+  return res.json()
 }
 
 export async function getMyCards(userId: string): Promise<UserCard[]> {
-  const supabase = createSupabaseClient()
-  const { data, error } = await supabase
-    .from('users_card')
-    .select('*, credit_cards(*, banks(*))')
-    .eq('user_id', userId)
-  if (error) throw error
-  return data ?? []
+  const res = await fetch(`/api/cards/my?userId=${encodeURIComponent(userId)}`)
+  if (!res.ok) throw new Error(`getMyCards failed: ${res.status}`)
+  return res.json()
 }
 
 export async function addCard(userId: string, cardId: string): Promise<void> {
-  const supabase = createSupabaseClient()
-  const { error } = await supabase
-    .from('users_card')
-    .insert({ user_id: userId, card_id: cardId })
-  if (error) throw error
+  const res = await fetch('/api/cards/my', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, cardId }),
+  })
+  if (!res.ok) throw new Error(`addCard failed: ${res.status}`)
 }
 
 export async function removeCard(userCardId: string): Promise<void> {
-  const supabase = createSupabaseClient()
-  const { error } = await supabase
-    .from('users_card')
-    .delete()
-    .eq('id', userCardId)
-  if (error) throw error
+  const res = await fetch(`/api/cards/my/${encodeURIComponent(userCardId)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`removeCard failed: ${res.status}`)
 }

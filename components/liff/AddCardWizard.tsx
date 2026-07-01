@@ -1,19 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────
-type Network = 'visa' | 'mastercard' | 'jcb' | 'amex'
+type Network = 'visa' | 'mastercard' | 'jcb' | 'amex' | 'unionpay'
 type RewardType = 'cashback' | 'miles' | 'points'
 
 interface WizardForm {
   bankId: string
   bankName: string
   bankColor: string
+  cardId: string
   productName: string
   last4: string
-  nameOnCard: string
-  network: Network
+  expiryDate: string
+  network: Network | ''
   colorVariant: string
   rewardType: RewardType
   rate: string
@@ -28,18 +29,6 @@ export interface AddCardWizardProps {
 }
 
 // ── Constants ─────────────────────────────────────────────────
-const BANKS = [
-  { id: 'KBANK', name: 'KASIKORNBANK',     initial: 'K', color: '#0a8665' },
-  { id: 'SCB',   name: 'SCB',              initial: 'ส', color: '#5e2b8f' },
-  { id: 'KTC',   name: 'KTC',              initial: 'K', color: '#e3603f' },
-  { id: 'UOB',   name: 'UOB',              initial: 'U', color: '#1c2a6a' },
-  { id: 'BBL',   name: 'Bangkok Bank',     initial: 'B', color: '#0a3a8b' },
-  { id: 'BAY',   name: 'Krungsri',         initial: 'ก', color: '#d99211' },
-  { id: 'AEON',  name: 'AEON',             initial: 'A', color: '#d9416f' },
-  { id: 'AMEX',  name: 'American Express', initial: 'A', color: '#2c343c' },
-  { id: 'CITI',  name: 'Citi',             initial: 'C', color: '#0e2c5c' },
-]
-
 const CARD_SWATCHES = [
   { id: 'kbank', bg: 'linear-gradient(135deg, #1c8c75, #07332a)' },
   { id: 'scb',   bg: 'linear-gradient(135deg, #6b2d8c, #341252)' },
@@ -52,6 +41,7 @@ const CARD_SWATCHES = [
 const BANK_DEFAULT_SWATCH: Record<string, string> = {
   KBANK: 'kbank', SCB: 'scb', KTC: 'ktc', UOB: 'uob',
   BBL: 'dark', BAY: 'dark', AEON: 'ktc', AMEX: 'amex', CITI: 'dark',
+  KTB: 'kbank', TTB: 'ktc', GSB: 'scb',
 }
 
 const NETWORKS: Array<{ id: Network; label: string }> = [
@@ -59,7 +49,17 @@ const NETWORKS: Array<{ id: Network; label: string }> = [
   { id: 'mastercard', label: 'Master' },
   { id: 'jcb', label: 'JCB' },
   { id: 'amex', label: 'AMEX' },
+  { id: 'unionpay', label: 'UnionPay' }
 ]
+
+function inferNetwork(cardName: string, bankId: string): Network {
+  const n = cardName.toLowerCase()
+  if (bankId === 'AMEX' || n.includes('amex') || n.includes('american express')) return 'amex'
+  if (n.includes('jcb')) return 'jcb'
+  if (n.includes('union')) return 'unionpay'
+  if (n.includes('master')) return 'mastercard'
+  return 'visa'
+}
 
 const REWARD_ITEMS: Array<{ id: RewardType; label: string; emoji: string }> = [
   { id: 'cashback', label: 'Cashback', emoji: '🎁' },
@@ -69,8 +69,8 @@ const REWARD_ITEMS: Array<{ id: RewardType; label: string; emoji: string }> = [
 
 const INITIAL_FORM: WizardForm = {
   bankId: '', bankName: '', bankColor: '',
-  productName: '', last4: '', nameOnCard: '',
-  network: 'visa', colorVariant: 'kbank',
+  cardId: '', productName: '', last4: '', expiryDate: '',
+  network: '', colorVariant: 'kbank',
   rewardType: 'cashback', rate: '1',
   statementDay: '5', dueDay: '25', creditLimit: '',
 }
@@ -219,9 +219,9 @@ function PreviewCard({ form, size = 'full' }: { form: WizardForm; size?: 'full' 
         <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600, letterSpacing: '-.2px' }}>
           {form.productName || 'ชื่อบัตร'}
         </div>
-        {form.nameOnCard && (
-          <div style={{ fontSize: 10, opacity: .6, textTransform: 'uppercase', letterSpacing: '.6px', marginTop: 2 }}>
-            {form.nameOnCard}
+        {form.expiryDate && (
+          <div style={{ fontSize: 10, opacity: .6, letterSpacing: '.6px', marginTop: 2 }}>
+            {form.expiryDate}
           </div>
         )}
       </div>
@@ -262,7 +262,7 @@ function Field({
               style={{
                 flex: 1, minWidth: 0, background: 'transparent',
                 border: 'none', outline: 'none', fontFamily: 'inherit',
-                fontSize: 14.5, fontWeight: value ? 500 : 400,
+                fontSize: 16, fontWeight: value ? 500 : 400,
                 color: value ? 'var(--ink)' : 'var(--ink-4)',
               }}
             />
@@ -288,15 +288,42 @@ function SectionLabel({ label, hint }: { label: string; hint?: string }) {
 }
 
 // ── Wizard ────────────────────────────────────────────────────
+interface BankItem { id: string; name: string; color: string; initial: string }
+
 export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [form, setForm] = useState<WizardForm>(INITIAL_FORM)
   const [searchBank, setSearchBank] = useState('')
+  const [banks, setBanks] = useState<BankItem[]>([])
+  const [creditCards, setCreditCards] = useState<{ id: string; card_name: string | null; card_tier: string | null }[]>([])
+  const [showCardPicker, setShowCardPicker] = useState(false)
+
+  useEffect(() => {
+    if (!form.bankId) return
+    fetch(`/api/cards/catalog?bankId=${encodeURIComponent(form.bankId)}`)
+      .then(r => r.json())
+      .then(setCreditCards)
+      .catch(() => {})
+  }, [form.bankId])
+
+  useEffect(() => {
+    fetch('/api/banks')
+      .then(r => r.json())
+      .then((data: { id: string; name_th: string | null; name_eng: string | null; color: string | null; initial: string | null }[]) => {
+        setBanks(data.map(b => ({
+          id: b.id,
+          name: b.name_th ?? b.name_eng ?? b.id,
+          color: b.color ?? '#666',
+          initial: b.initial ?? b.id.charAt(0),
+        })))
+      })
+      .catch(() => {})
+  }, [])
 
   const set = <K extends keyof WizardForm>(key: K, val: WizardForm[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
-  const filteredBanks = BANKS.filter(b =>
+  const filteredBanks = banks.filter(b =>
     b.name.toLowerCase().includes(searchBank.toLowerCase()) ||
     b.id.toLowerCase().includes(searchBank.toLowerCase())
   )
@@ -338,11 +365,14 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
             const sel = form.bankId === b.id
             return (
               <button key={b.id}
-                onClick={() => setForm(f => ({
-                  ...f,
-                  bankId: b.id, bankName: b.name, bankColor: b.color,
-                  colorVariant: BANK_DEFAULT_SWATCH[b.id] ?? 'dark',
-                }))}
+                onClick={() => {
+                  setForm(f => ({
+                    ...f,
+                    bankId: b.id, bankName: b.name, bankColor: b.color,
+                    colorVariant: BANK_DEFAULT_SWATCH[b.id] ?? 'dark',
+                  }))
+                  setStep(2)
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px',
                   background: 'var(--surface)', borderRadius: 12, textAlign: 'left',
@@ -373,20 +403,20 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
         </div>
       </div>
 
-      <Footer>
-        <PrimaryBtn icon="next" onClick={() => setStep(2)} disabled={!form.bankId}>ถัดไป</PrimaryBtn>
-      </Footer>
     </div>
   )
 
   // ── Step 2 — รายละเอียดบัตร ──────────────────────────────
   if (step === 2) {
-    const canNext = form.last4.length === 4
+    const canNext = form.productName.trim() !== ''
     return (
       <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
-        <AppBar title="เพิ่มบัตร" onBack={() => setStep(1)} />
+        <AppBar title="เพิ่มบัตร" onBack={() => {
+          setForm(f => ({ ...f, cardId: '', productName: '', network: '' }))
+          setStep(1)
+        }} />
 
-        <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-2">
           <StepHeader step={2} label="รายละเอียดบัตร" />
 
           <PreviewCard form={form} />
@@ -398,14 +428,49 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
           <div style={{ marginTop: 16 }}>
             <SectionLabel label="ข้อมูลบัตร" hint="จำเป็น" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Field label="ชื่อบัตร / ประเภท" value={form.productName}
-                onChange={v => set('productName', v)} placeholder="เช่น Journey Platinum" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {creditCards.length > 0 ? (
+                /* Tappable field that opens bottom sheet */
+                <button
+                  onClick={() => setShowCardPicker(true)}
+                  style={{
+                    background: 'var(--surface)', borderRadius: 12, padding: '9px 13px',
+                    border: '1.5px solid var(--line)', width: '100%', textAlign: 'left',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--ink-3)' }}>
+                      ชื่อบัตร / ประเภท <span style={{ color: 'var(--warn)' }}>*</span>
+                    </div>
+                    <div style={{
+                      marginTop: 2, fontSize: 16,
+                      fontWeight: form.productName ? 500 : 400,
+                      color: form.productName ? 'var(--ink)' : 'var(--ink-4)',
+                    }}>
+                      {form.productName || 'โปรดเลือกบัตร'}
+                    </div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="var(--ink-4)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+                    style={{ flexShrink: 0, marginLeft: 8 }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+              ) : (
+                <Field label="ชื่อบัตร / ประเภท" value={form.productName}
+                  onChange={v => set('productName', v)} placeholder="เช่น Journey Platinum" required />
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8 }}>
                 <Field label="เลข 4 ตัวท้าย" value={form.last4}
                   onChange={v => set('last4', v.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="4521" prefix="••••" required maxLength={4} />
-                <Field label="ชื่อบนบัตร" value={form.nameOnCard}
-                  onChange={v => set('nameOnCard', v)} placeholder="ชื่อ-นามสกุล" />
+                  placeholder="4521" maxLength={4} />
+                <Field label="วันหมดอายุ" value={form.expiryDate}
+                  onChange={v => {
+                    const digits = v.replace(/\D/g, '').slice(0, 4)
+                    const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits
+                    set('expiryDate', formatted)
+                  }} placeholder="MM/YY" />
               </div>
             </div>
           </div>
@@ -415,17 +480,19 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
             <SectionLabel label="เครือข่าย & สีบัตร" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Network picker */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
                 {NETWORKS.map(n => {
                   const sel = form.network === n.id
+                  const locked = !!form.cardId
                   return (
-                    <button key={n.id} onClick={() => set('network', n.id)} style={{
+                    <button key={n.id} onClick={() => !locked && set('network', n.id)} style={{
                       padding: '9px 4px', borderRadius: 10, textAlign: 'center',
                       border: `1.5px solid ${sel ? 'var(--brand-600)' : 'var(--line)'}`,
                       background: sel ? 'var(--brand-50)' : 'var(--surface)',
                       color: sel ? 'var(--brand-700)' : 'var(--ink-3)',
                       fontSize: 11, fontWeight: 600, letterSpacing: '.2px',
-                      cursor: 'pointer', fontFamily: 'inherit',
+                      cursor: locked ? 'default' : 'pointer', fontFamily: 'inherit',
+                      opacity: locked && !sel ? 0.35 : 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                     }}>
                       {sel && (
@@ -471,10 +538,128 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
 
         <Footer>
           <div style={{ display: 'flex', gap: 8 }}>
-            <GhostBtn onClick={() => setStep(1)}>ย้อนกลับ</GhostBtn>
+            <GhostBtn onClick={() => {
+              setForm(f => ({ ...f, cardId: '', productName: '', network: '' }))
+              setStep(1)
+            }}>ย้อนกลับ</GhostBtn>
             <PrimaryBtn icon="next" onClick={() => setStep(3)} disabled={!canNext}>ถัดไป</PrimaryBtn>
           </div>
         </Footer>
+
+        {/* Bottom sheet — card picker */}
+        {showCardPicker && (
+          <>
+            {/* Backdrop */}
+            <div
+              onClick={() => setShowCardPicker(false)}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 70,
+                background: 'rgba(0,0,0,.45)',
+              }}
+            />
+            {/* Sheet */}
+            <div style={{
+              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 71,
+              background: 'var(--surface)',
+              borderRadius: '20px 20px 0 0',
+              boxShadow: '0 -4px 32px rgba(0,0,0,.18)',
+              display: 'flex', flexDirection: 'column',
+              maxHeight: '78vh',
+            }}>
+              {/* Handle */}
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--surface-3)' }} />
+              </div>
+              {/* Header */}
+              <div style={{ padding: '4px 16px 12px', fontSize: 15, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-.3px' }}>
+                เลือกชื่อบัตร
+              </div>
+              {/* Card list */}
+              <div style={{ overflowY: 'auto', padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {/* Empty / clear option */}
+                {(
+                  <button
+                    onClick={() => {
+                      setForm(f => ({ ...f, cardId: '', productName: '', network: '' }))
+                      setShowCardPicker(false)
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px',
+                      background: 'var(--surface)', borderRadius: 12, textAlign: 'left',
+                      border: `1.5px solid ${!form.cardId ? 'var(--brand-600)' : 'var(--line)'}`,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-3)' }}>— ไม่ระบุ —</div>
+                    </div>
+                    {!form.cardId && (
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 999, background: 'var(--brand-600)',
+                        color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0,
+                      }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    )}
+                    {form.cardId && (
+                      <div style={{ width: 22, height: 22, borderRadius: 999, border: '2px solid var(--surface-3)', flexShrink: 0 }} />
+                    )}
+                  </button>
+                )}
+                {creditCards.map(c => {
+                  const sel = form.cardId === c.id
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setForm(f => ({
+                          ...f,
+                          cardId: c.id,
+                          productName: c.card_name ?? '',
+                          network: inferNetwork(c.card_name ?? '', f.bankId),
+                        }))
+                        setShowCardPicker(false)
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px',
+                        background: 'var(--surface)', borderRadius: 12, textAlign: 'left',
+                        border: `1.5px solid ${sel ? 'var(--brand-600)' : 'var(--line)'}`,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{c.card_name}</div>
+                        {c.card_tier && (
+                          <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 1 }}>{c.card_tier}</div>
+                        )}
+                      </div>
+                      {sel
+                        ? <div style={{
+                            width: 22, height: 22, borderRadius: 999, background: 'var(--brand-600)',
+                            color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0,
+                          }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                              strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </div>
+                        : <div style={{ width: 22, height: 22, borderRadius: 999, border: '2px solid var(--surface-3)', flexShrink: 0 }} />
+                      }
+                    </button>
+                  )
+                })}
+                {creditCards.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: 'var(--ink-4)' }}>
+                    ไม่พบบัตรที่ค้นหา
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -484,7 +669,7 @@ export function AddCardWizard({ onClose, onComplete }: AddCardWizardProps) {
     <div className="fixed inset-0 z-[60] bg-surface flex flex-col overflow-hidden">
       <AppBar title="เพิ่มบัตร" onBack={() => setStep(2)} />
 
-      <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-2">
         <StepHeader step={3} label="สิทธิ์ & รอบบัตร" />
 
         {/* Continuity strip */}

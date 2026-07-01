@@ -12,6 +12,8 @@ model banks {
   name_th      String?        @db.VarChar
   name_eng     String?        @db.VarChar
   logo_url     String?
+  color        String?        @db.VarChar
+  initial      String?        @db.VarChar
   created_date DateTime       @default(now()) @db.Timestamptz(6)
   created_by   String?        @db.VarChar
   updated_date DateTime?      @db.Date
