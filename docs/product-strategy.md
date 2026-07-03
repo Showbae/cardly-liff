@@ -90,6 +90,12 @@
 - ระบบเก็บแค่เลข 4 ตัวท้าย ไม่เก็บเลขบัตรเต็ม (PCI-lite)
 - หน้า Wallet แสดงรายการบัตรทั้งหมดของ user แบบ real-time หลัง add/delete
 
+> ⚠️ **Note (schema ↔ design mismatch):** design handoff ระบุให้เก็บ `last4` (4 ตัวท้าย) และไม่เก็บ PAN
+> แต่ schema ปัจจุบัน ตาราง `users_card` มีแค่ `user_id` + `card_id` (link ไป catalog กลาง) — **ยังไม่มี field `last4`**
+> จึงยังทำ AC ข้อ "เก็บ 4 ตัวท้าย" และการแสดงผล `•••• 4521` ตาม design ไม่ได้
+> **ต้องตัดสินใจก่อน:** (ก) เพิ่ม field `last4` (+ อาจรวม nameOnCard/network/color) ใน `users_card` เพื่อรองรับบัตรรุ่นเดียวกันหลายใบ
+> หรือ (ข) ยอมรับว่า 1 user ถือบัตรได้รุ่นละ 1 ใบ แล้วตัด AC ข้อนี้ออก
+
 **2. Promo Database**
 - มี schema รองรับ promo (title, type, benefit, min_spend, cap, validity, source)
 - มี API CRUD (อย่างน้อย read) ให้ frontend ดึงโปรตาม bank/category ได้
