@@ -97,9 +97,12 @@
 > หรือ (ข) ยอมรับว่า 1 user ถือบัตรได้รุ่นละ 1 ใบ แล้วตัด AC ข้อนี้ออก
 
 **2. Promo Database**
-- มี schema รองรับ promo (title, type, benefit, min_spend, cap, validity, source)
-- มี API CRUD (อย่างน้อย read) ให้ frontend ดึงโปรตาม bank/category ได้
-- มี seed data โปรจริงอย่างน้อย 20–30 รายการ เพื่อ validate schema ใช้งานได้จริง
+- มี schema รองรับ promo (title, type, benefit, min_spend, cap, validity, source) — ✅ มีแล้ว
+- **Read API** ให้ LIFF frontend ดึงโปรตาม bank/category ได้
+- **Write path** (admin portal หรือ import/seed script) สำหรับทีม content ใส่/แก้โปร — user ไม่ได้เป็นคนสร้างโปรเอง
+- มีข้อมูลโปรจริงเข้าระบบพอ validate schema ใช้งานได้จริง (จำนวนขั้นต่ำ: TBD — PO กำหนด)
+
+> ℹ️ **Note:** ยังไม่มี seed/import infrastructure ในโค้ด (ไม่มี seed script, ไม่มี `prisma.seed` config, ไม่มี admin/promo API) — ต้องสร้างใหม่ทั้งหมด
 
 **3. MCC Mapping v1**
 - มี mapping merchant → category ครอบคลุมร้านชื่อดังอย่างน้อย ~500 ร้าน
