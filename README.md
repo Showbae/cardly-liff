@@ -1,46 +1,107 @@
-# Getting Started with Create React App
+# Cardly LIFF
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Cardly is a LINE-integrated web app that helps Thai users pick the best credit card to swipe at any merchant — "Google Maps for credit cards." Built as a LIFF (LINE Front-end Framework) app with a Next.js backend and Supabase/PostgreSQL database.
+
+> For product vision, customer segments, and the feature backlog, see [`docs/product-strategy.md`](./docs/product-strategy.md).
+> For codebase conventions, see [`CLAUDE.md`](./CLAUDE.md).
+
+## Tech Stack
+
+- **Frontend**: Next.js (App Router, TypeScript), Tailwind CSS
+- **LINE Integration**: LIFF SDK (`@line/liff`)
+- **Backend**: Next.js API Routes (serverless)
+- **ORM**: Prisma, with `@prisma/adapter-pg` against Supabase Postgres
+- **Database**: Supabase (PostgreSQL)
+- **Validation**: Zod
+- **Hosting**: Vercel
+
+## Project Structure
+
+```
+app/
+├── (liff)/            # LIFF frontend routes (wallet, promo, me)
+└── api/                # Serverless API routes (auth/line, cards, banks)
+components/
+lib/                    # Prisma client, Supabase clients, LIFF helpers
+prisma/
+├── schema.prisma
+docs/
+├── product-strategy.md  # Product vision, segments, backlog, roadmap
+└── design/               # Hi-fi design handoff docs
+```
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- A Supabase project (for `DATABASE_URL` / `DIRECT_URL`)
+- A LINE LIFF app (for `NEXT_PUBLIC_LIFF_ID` and channel credentials)
+
+### Setup
+
+```bash
+npm install
+```
+
+Create a `.env.local` file with the following variables:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Database (Prisma)
+DATABASE_URL=          # Supabase pooler URL (port 6543)
+DIRECT_URL=             # Supabase direct URL (port 5432), used for migrations
+
+# LINE / LIFF
+NEXT_PUBLIC_LIFF_ID=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_CHANNEL_SECRET=
+
+# App
+NEXT_PUBLIC_APP_URL=
+```
+
+Then run:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view the app.
+
+To test the LIFF app inside the LINE client, use the ngrok-tunneled dev server instead:
+
+```bash
+npm run dev:tunnel
+```
 
 ## Available Scripts
 
-In the project directory, you can run:
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Next.js dev server |
+| `npm run dev:tunnel` | Dev server + ngrok tunnel (for testing inside LINE) |
+| `npm run build` | Production build |
+| `npm run start` | Start the production server |
+| `npm run lint` | Run ESLint |
+| `npx tsc --noEmit` | Type check |
 
-### `npm start`
+## Database (Prisma)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```bash
+npx prisma generate            # regenerate the Prisma client (also runs on postinstall)
+npx prisma migrate dev --name <name>   # create/apply a migration in development
+npx prisma migrate deploy      # apply migrations in production
+npx prisma studio              # open the Prisma Studio GUI
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Deployment
 
-### `npm test`
+Hosted on Vercel:
+- `main` branch → Production
+- `develop` branch → Preview
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Environment variables are set in the Vercel dashboard, not committed to the repo. Run `npx prisma migrate deploy` as part of the deploy pipeline before the app serves traffic on a new schema.
