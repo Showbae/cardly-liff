@@ -30,7 +30,7 @@
 
 ## 📋 Master Product Backlog (22 Features)
 
-### 🔴 P0 — Foundation (Phase 1: 0–3 เดือน) | 63 SP
+### 🔴 P0 — Foundation (Phase 1: 0–3 เดือน) | 76 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
@@ -50,7 +50,7 @@
 | 9 | ✅ **User Verified Promo** | 8 | Trust layer — community ยืนยันว่าโปรยังใช้ได้ไหม |
 | 10 | 💰 **Cashback & Spending Analytics** | 8 | Insight loop — "เดือนนี้ประหยัดได้ X บาท" สร้าง emotional reward |
 
-### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 93 SP
+### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 99 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
@@ -79,16 +79,142 @@
 
 ---
 
+## ✅ Acceptance Criteria (ต่อ Feature)
+
+> Issue tracking: feature #N ในตารางด้านบน = GitHub issue #(N+1) — เช่น feature 1 (My Cards Wallet) = [issue #2](https://github.com/Showbae/cardly-liff/issues/2)
+
+### P0 — Foundation
+
+**1. My Cards Wallet**
+- ผู้ใช้เพิ่ม/แก้ไข/ลบบัตรของตัวเองได้ พร้อมเลือกธนาคาร+ประเภทบัตรจาก catalog
+- ระบบเก็บแค่เลข 4 ตัวท้าย ไม่เก็บเลขบัตรเต็ม (PCI-lite)
+- หน้า Wallet แสดงรายการบัตรทั้งหมดของ user แบบ real-time หลัง add/delete
+
+**2. Promo Database**
+- มี schema รองรับ promo (title, type, benefit, min_spend, cap, validity, source)
+- มี API CRUD (อย่างน้อย read) ให้ frontend ดึงโปรตาม bank/category ได้
+- มี seed data โปรจริงอย่างน้อย 20–30 รายการ เพื่อ validate schema ใช้งานได้จริง
+
+**3. MCC Mapping v1**
+- มี mapping merchant → category ครอบคลุมร้านชื่อดังอย่างน้อย ~500 ร้าน
+- ระบบ resolve ชื่อร้านที่ user พิมพ์ (fuzzy match) ไปเป็น category ได้ถูกต้อง ≥80% ของ query ทดสอบ
+- มี fallback category "อื่นๆ" เมื่อ resolve ไม่ได้
+
+**4. Merchant Search & Discovery**
+- ค้นหาร้าน/หมวดจาก search bar แล้วได้ผลลัพธ์จริงจาก merchants table (ไม่ใช่ mock)
+- แตะ category tile แล้ว trigger การค้นหาตาม category นั้น
+- แสดง recent searches จริงจาก user history ไม่ใช่ hardcoded
+
+**5. Best Card Recommendation (Rule-based)**
+- ให้ merchant/category หนึ่งค่า ระบบคำนวณและจัดอันดับบัตรของ user ตาม net reward ได้
+- ผลลัพธ์แสดงบัตรที่คุ้มสุด 1 ใบ พร้อม runner-up อย่างน้อย 2 ใบ พร้อมส่วนต่าง (บาท)
+- Logic คำนึงถึง cap ที่ใช้ไปแล้วของบัตรนั้น (ไม่แนะนำบัตรที่ชนเพดานแล้ว)
+
+**6. Promo Expiration Alert**
+- ระบบสร้าง alert อัตโนมัติเมื่อโปรที่ user เกี่ยวข้องใกล้หมดอายุ (เช่น ≤3 วัน)
+- แสดงบน Home ในโซน "ต้องรีบ" จากข้อมูลจริง ไม่ใช่ hardcoded
+- Alert type ครอบคลุมอย่างน้อย 3 แบบ: expiring promo, cap reached, threshold to reward
+
+### P1 — Core Loop
+
+**7. Benefit & Threshold Tracker**
+- แสดงยอดใช้จ่ายสะสมต่อบัตรเทียบกับ threshold ของ promo/สิทธิ์
+- แจ้งเตือนเมื่อใกล้ถึงขั้นต่ำหรือใกล้ชนเพดาน
+- ข้อมูล reset ตามรอบบิล/รอบเดือนที่ถูกต้อง
+
+**8. Personalized Recommendation (ML-based)**
+- ระบบแนะนำบัตรโดยพิจารณาพฤติกรรมใช้จ่ายจริงของ user ไม่ใช่ rule ตายตัว
+- มี mechanism เก็บ feedback ว่า user กดใช้คำแนะนำหรือไม่ เพื่อปรับปรุงโมเดล
+- Fallback กลับไปใช้ rule-based ได้เมื่อข้อมูล user ยังน้อยเกินไป
+
+**9. User Verified Promo**
+- User กดยืนยัน/แจ้งว่าโปรใช้ได้จริงหรือหมดแล้วได้
+- แสดง trust indicator (เช่น "ยืนยันล่าสุดเมื่อ X วันก่อน โดย Y คน") บน promo card
+- โปรที่ถูก report ว่าหมดอายุหลายครั้งถูกซ่อน/ตั้ง flag อัตโนมัติ
+
+**10. Cashback & Spending Analytics**
+- สรุปยอดประหยัด/cashback รายเดือนต่อ user แบบ dashboard
+- Breakdown ตาม category และตามบัตร
+- ข้อมูลอัปเดตตาม transaction ที่ user log ผ่านแอป (ไม่ต้องพึ่ง bank sync)
+
+### P2 — Power Users
+
+**11. MCC Mapping Full v2**
+- ขยาย mapping จาก ~500 ร้าน เป็นครอบคลุม MCC มาตรฐานเต็มรูปแบบ
+- รองรับร้านที่ไม่อยู่ใน whitelist เดิมด้วย MCC code lookup จริง
+- Backward compatible กับ v1 (ไม่ breaking merchant ที่ map ไว้แล้ว)
+
+**12. Miles & Points Aggregator**
+- Track ไมล์/พอยต์สะสมของ user ข้ามหลาย program (เช่น JAL, AirAsia, T1)
+- แจ้งเตือนก่อนไมล์/พอยต์หมดอายุ
+- แสดง conversion rate ระหว่าง program ให้ user เทียบมูลค่าได้
+
+**13. Split Bill Optimizer**
+- Input ยอดบิลรวม → ระบบแนะนำวิธี split ให้ได้ cashback สูงสุดจากบัตรที่ user มี
+- คำนึงถึง minimum spend ต่อรายการของแต่ละบัตร/โปร (ถ้ามี)
+- แสดงผลต่างระหว่าง split ตามคำแนะนำ vs รูดใบเดียว
+
+**14. Travel Card Advisor**
+- Input ประเทศปลายทาง → แนะนำบัตรที่เหมาะสุด (FX fee ต่ำสุด/ไมล์คุ้มสุด)
+- แสดงค่าธรรมเนียม FX ของแต่ละบัตรเทียบกัน
+- ครอบคลุมอย่างน้อย 10 ประเทศยอดนิยมของกลุ่ม Travel Hacker
+
+**15. Promo Stacking Simulator**
+- จำลองการ stack โปรหลายชั้น (bank promo + merchant promo + point multiplier) แล้วคำนวณผลรวมได้
+- แจ้งเงื่อนไขที่ stack ไม่ได้ (mutually exclusive) ให้ user รู้ก่อนใช้จริง
+- ผลลัพธ์ accuracy ตรวจสอบกับเคสจริงอย่างน้อย 5 เคสจาก community data
+
+**16. Health & Medical Card Tracker**
+- List สิทธิ์บัตรที่เกี่ยวกับค่ารักษาพยาบาล/โรงพยาบาลที่ user มี
+- แจ้งเตือนเมื่อใกล้ครบ/ใกล้หมดสิทธิ์ทางการแพทย์ (เช่น ผ่อน 0% รพ.)
+- ครอบคลุมอย่างน้อยธนาคารที่มีสิทธิ์ทางการแพทย์เด่นชัด (AEON Wellness, KBank BDMS)
+
+**17. Merchant Review**
+- User เขียน/ให้คะแนนรีวิวร้านที่เกี่ยวกับการใช้บัตรได้
+- แสดง average rating + จำนวนรีวิวบน merchant detail
+- มีระบบป้องกัน spam/fake review เบื้องต้น (เช่น 1 user 1 review ต่อร้าน)
+
+### P3 — AI Layer
+
+**18. AI Ask Assistant**
+- User พิมพ์ถามคำถามอิสระ (เช่น "จะไปเที่ยวญี่ปุ่นควรใช้บัตรไหน") แล้วได้คำตอบที่อ้างอิงข้อมูลจริงในระบบ
+- คำตอบอ้างอิง source ได้ ไม่ hallucinate ข้อมูลโปรที่ไม่มีจริง
+- Latency คำตอบอยู่ในระดับใช้งานได้จริงบน mobile (ไม่เกิน ~5 วินาที)
+
+**19. Screenshot Promo Analyzer**
+- User อัปโหลด/ถ่ายภาพโปรโมชั่น → ระบบ extract ข้อมูล (ธนาคาร, ส่วนลด, เงื่อนไข, วันหมดอายุ) อัตโนมัติ
+- มี review step ให้ user ยืนยันก่อนบันทึกเข้า Promo DB จริง (กัน parse ผิด)
+- Accuracy การ parse ข้อมูลหลักถูกต้อง ≥85% จากชุดทดสอบภาพโปรจริง
+
+**20. AI Recommendation Feed**
+- ระบบ push โปร/คำแนะนำที่ตรงกับ spending pattern ของ user โดยไม่ต้อง user ค้นหาเอง
+- มี mechanism ให้ user กด "ไม่สนใจ" เพื่อลด noise ของ feed ถัดไป
+- Feed อัปเดตความถี่ที่เหมาะสม ไม่ spam แจ้งเตือนถี่เกินไป
+
+### P4 — Platform
+
+**21. Statement OCR**
+- User อัปโหลด statement (PDF/รูป) → ระบบ extract รายการ transaction อัตโนมัติ
+- Map transaction แต่ละรายการเข้า category/merchant ที่ระบบรู้จักได้
+- รองรับ statement format จากธนาคารหลักอย่างน้อย 3–5 แห่ง
+
+**22. Bank Sync Integration**
+- เชื่อมต่อกับธนาคารผ่าน API ที่ได้รับอนุญาต (Open Banking / consent-based) เพื่อดึง transaction อัตโนมัติ
+- ผ่าน security/compliance review ตามข้อกำหนดธนาคารแห่งประเทศไทย
+- User เพิกถอนสิทธิ์การเชื่อมต่อได้ตลอดเวลา (revoke consent)
+
+---
+
 ## 🗓️ Roadmap Summary
 
 | Phase | Features | SP | Timeline |
 |-------|---------|:--:|----------|
-| Phase 1: Foundation | #1–6 | 63 | 0–3 เดือน |
+| Phase 1: Foundation | #1–6 | 76 | 0–3 เดือน |
 | Phase 2: Core Loop | #7–10 | 37 | 3–6 เดือน |
-| Phase 3: Power Users | #11–17 | 93 | 6–9 เดือน |
+| Phase 3: Power Users | #11–17 | 99 | 6–9 เดือน |
 | Phase 4: AI Layer | #18–20 | 68 | 9–12 เดือน |
 | Phase 5: Platform | #21–22 | 76 | 12+ เดือน |
-| **รวม** | **22 features** | **337** | **~18 เดือน** |
+| **รวม** | **22 features** | **356** | **~18 เดือน** |
 
 > Velocity แนะนำ: 2-week sprint, 20–25 SP/sprint
 
