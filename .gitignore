@@ -31,4 +31,8 @@ yarn-error.log*
 tsconfig.tsbuildinfo
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+!.claude/agents/
+.claude/settings.local.json
