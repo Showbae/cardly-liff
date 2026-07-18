@@ -2,6 +2,7 @@ export interface Bank {
   id: string
   name_th: string | null
   name_eng: string | null
+  initial: string | null
 }
 
 export interface CreditCard {
@@ -16,6 +17,9 @@ export interface CreditCard {
 export interface UserCard {
   id: string
   card_id: string | null
+  last_four: string | null
+  credit_limit: string | null   // Prisma Decimal serialises to string
+  billing_cycle_day: number | null
   credit_cards: CreditCard | null
 }
 
@@ -45,4 +49,19 @@ export async function removeCard(userCardId: string): Promise<void> {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`removeCard failed: ${res.status}`)
+}
+
+export interface UpdateCardPayload {
+  last_four?: string | null
+  credit_limit?: number | null
+  billing_cycle_day?: number | null
+}
+
+export async function updateCard(userCardId: string, payload: UpdateCardPayload): Promise<void> {
+  const res = await fetch(`/api/cards/my/${encodeURIComponent(userCardId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`updateCard failed: ${res.status}`)
 }
