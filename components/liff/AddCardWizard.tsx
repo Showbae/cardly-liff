@@ -50,7 +50,7 @@ const NETWORKS: Array<{ id: Network; label: string }> = [
   { id: 'unionpay', label: 'UnionPay' }
 ]
 
-function inferNetwork(cardName: string, bankId: string): Network {
+export function inferNetwork(cardName: string, bankId: string): Network {
   const n = cardName.toLowerCase()
   if (bankId === 'AMEX' || n.includes('amex') || n.includes('american express')) return 'amex'
   if (n.includes('jcb')) return 'jcb'
@@ -297,10 +297,21 @@ export function AddCardWizard({ userId, onClose, onComplete }: AddCardWizardProp
     setIsSaving(true)
     setSaveError(null)
     try {
+      const statementDayNum = Number(form.statementDay)
+      const dueDayNum = Number(form.dueDay)
+      const limitNum = form.creditLimit ? Number(form.creditLimit.replace(/,/g, '')) : null
+
       const res = await fetch('/api/cards/my', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, cardId: form.cardId }),
+        body: JSON.stringify({
+          userId,
+          cardId: form.cardId,
+          ...(form.last4.length === 4 && { last_four: form.last4 }),
+          ...(limitNum && limitNum > 0 && { credit_limit: limitNum }),
+          ...(statementDayNum >= 1 && statementDayNum <= 28 && { billing_cycle_day: statementDayNum }),
+          ...(dueDayNum >= 1 && dueDayNum <= 31 && { payment_due_day: dueDayNum }),
+        }),
       })
       if (!res.ok) throw new Error()
       setStep(4)

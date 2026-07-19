@@ -16,10 +16,13 @@ export async function DELETE(
   }
 }
 
-const patchSchema = z.object({
+export const patchSchema = z.object({
   last_four: z.string().length(4).regex(/^\d{4}$/).nullable().optional(),
   credit_limit: z.number().positive().nullable().optional(),
   billing_cycle_day: z.number().int().min(1).max(28).nullable().optional(),
+  billing_last_day: z.boolean().nullable().optional(),
+  payment_due_day: z.number().int().min(1).max(31).nullable().optional(),
+  payment_due_last_day: z.boolean().nullable().optional(),
 })
 
 export async function PATCH(

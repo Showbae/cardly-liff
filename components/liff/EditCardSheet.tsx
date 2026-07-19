@@ -14,16 +14,17 @@ const BANK_GRADIENT: Record<string, string> = {
   AEON:  'linear-gradient(135deg, #d9416f, #8b1a3d)',
 }
 
-function chipGradient(bankId?: string | null) {
+export function chipGradient(bankId?: string | null) {
   return BANK_GRADIENT[bankId ?? ''] ?? 'linear-gradient(135deg, #2a3a33, #0c1612)'
 }
 
 const QUICK_DAYS = [5, 10, 15, 20, 25, 28]
+const QUICK_DUE_DAYS = [1, 5, 10, 15, 20, 25]
 
 interface Props {
   card: UserCard
   onClose: () => void
-  onSaved: (updated: Pick<UserCard, 'id' | 'last_four' | 'credit_limit' | 'billing_cycle_day'>) => void
+  onSaved: (updated: Pick<UserCard, 'id' | 'last_four' | 'credit_limit' | 'billing_cycle_day' | 'payment_due_day'>) => void
 }
 
 export function EditCardSheet({ card, onClose, onSaved }: Props) {
@@ -35,6 +36,7 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
     card.credit_limit ? Number(card.credit_limit).toLocaleString('th-TH', { maximumFractionDigits: 0 }) : ''
   )
   const [billingDay, setBillingDay] = useState<number | null>(card.billing_cycle_day ?? null)
+  const [billingLastDay, setBillingLastDay] = useState(card.billing_last_day ?? false)
   const [customDay, setCustomDay] = useState(
     card.billing_cycle_day && !QUICK_DAYS.includes(card.billing_cycle_day)
       ? String(card.billing_cycle_day)
@@ -43,13 +45,24 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
   const [useCustomDay, setUseCustomDay] = useState(
     card.billing_cycle_day ? !QUICK_DAYS.includes(card.billing_cycle_day) : false
   )
+  const [paymentDueDay, setPaymentDueDay] = useState<number | null>(card.payment_due_day ?? null)
+  const [paymentDueLastDay, setPaymentDueLastDay] = useState(card.payment_due_last_day ?? false)
+  const [customDueDay, setCustomDueDay] = useState(
+    card.payment_due_day && !QUICK_DUE_DAYS.includes(card.payment_due_day)
+      ? String(card.payment_due_day)
+      : ''
+  )
+  const [useCustomDueDay, setUseCustomDueDay] = useState(
+    card.payment_due_day ? !QUICK_DUE_DAYS.includes(card.payment_due_day) : false
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
     const rawLimit = creditLimit.replace(/,/g, '')
     const limitNum = rawLimit ? Number(rawLimit) : null
-    const dayNum = useCustomDay ? (Number(customDay) || null) : billingDay
+    const dayNum = billingLastDay ? null : (useCustomDay ? (Number(customDay) || null) : billingDay)
+    const dueNum = paymentDueLastDay ? null : (useCustomDueDay ? (Number(customDueDay) || null) : paymentDueDay)
 
     setSaving(true)
     setError(null)
@@ -58,12 +71,16 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
         last_four: lastFour.length === 4 ? lastFour : null,
         credit_limit: limitNum,
         billing_cycle_day: dayNum,
+        billing_last_day: billingLastDay,
+        payment_due_day: dueNum,
+        payment_due_last_day: paymentDueLastDay,
       })
       onSaved({
         id: card.id,
         last_four: lastFour.length === 4 ? lastFour : null,
         credit_limit: limitNum !== null ? String(limitNum) : null,
         billing_cycle_day: dayNum,
+        payment_due_day: dueNum,
       })
     } catch {
       setError('บันทึกไม่สำเร็จ กรุณาลองใหม่')
@@ -76,6 +93,8 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
     if (!digits) { setCreditLimit(''); return }
     setCreditLimit(Number(digits).toLocaleString('th-TH', { maximumFractionDigits: 0 }))
   }
+
+  const cannotSave = saving || (lastFour.length > 0 && lastFour.length < 4)
 
   return (
     <>
@@ -190,20 +209,32 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
         </div>
 
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-3)', marginBottom: 8 }}>
-            วันตัดรอบ
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-3)' }}>วันตัดรอบ</span>
+            {(billingDay !== null || billingLastDay || useCustomDay) && (
+              <button
+                onClick={() => { setBillingDay(null); setBillingLastDay(false); setUseCustomDay(false); setCustomDay('') }}
+                style={{
+                  background: 'none', border: 'none', padding: '0 2px',
+                  fontSize: 12, color: 'var(--ink-4)', cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                ล้าง
+              </button>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {QUICK_DAYS.map(d => (
               <button
                 key={d}
-                onClick={() => { setBillingDay(d); setUseCustomDay(false) }}
+                onClick={() => { setBillingDay(d); setBillingLastDay(false); setUseCustomDay(false) }}
                 style={{
                   minWidth: 36, height: 34, borderRadius: 8, padding: '0 10px',
                   fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-                  background: (!useCustomDay && billingDay === d) ? 'var(--brand-50)' : 'var(--surface-2)',
-                  border: `1.5px solid ${(!useCustomDay && billingDay === d) ? 'var(--brand)' : 'transparent'}`,
-                  color: (!useCustomDay && billingDay === d) ? 'var(--brand-700)' : 'var(--ink-3)',
+                  background: (!useCustomDay && !billingLastDay && billingDay === d) ? 'var(--brand-50)' : 'var(--surface-2)',
+                  border: `1.5px solid ${(!useCustomDay && !billingLastDay && billingDay === d) ? 'var(--brand)' : 'transparent'}`,
+                  color: (!useCustomDay && !billingLastDay && billingDay === d) ? 'var(--brand-700)' : 'var(--ink-3)',
                   transition: 'all .12s',
                 }}
               >
@@ -211,7 +242,20 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
               </button>
             ))}
             <button
-              onClick={() => setUseCustomDay(true)}
+              onClick={() => { setBillingLastDay(true); setBillingDay(null); setUseCustomDay(false) }}
+              style={{
+                minWidth: 52, height: 34, borderRadius: 8, padding: '0 10px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                background: billingLastDay ? 'var(--brand-50)' : 'var(--surface-2)',
+                border: `1.5px solid ${billingLastDay ? 'var(--brand)' : 'transparent'}`,
+                color: billingLastDay ? 'var(--brand-700)' : 'var(--ink-3)',
+                transition: 'all .12s',
+              }}
+            >
+              สิ้นเดือน
+            </button>
+            <button
+              onClick={() => { setUseCustomDay(true); setBillingLastDay(false) }}
               style={{
                 minWidth: 52, height: 34, borderRadius: 8, padding: '0 10px',
                 fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
@@ -236,7 +280,102 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
                 maxLength={2}
                 placeholder="วันที่ 1–28"
                 value={customDay}
-                onChange={e => setCustomDay(e.target.value.replace(/\D/g, ''))}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, '')
+                  if (!digits) { setCustomDay(''); return }
+                  setCustomDay(Number(digits) > 28 ? '28' : digits)
+                }}
+                autoFocus
+                style={{
+                  flex: 1, padding: '13px 14px',
+                  fontSize: 15, color: 'var(--ink)', background: 'transparent',
+                  border: 'none', outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <span style={{ fontSize: 12, color: 'var(--ink-4)', paddingRight: 14, whiteSpace: 'nowrap' }}>
+                ของทุกเดือน
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-3)' }}>วันครบกำหนดชำระ</span>
+            {(paymentDueDay !== null || paymentDueLastDay || useCustomDueDay) && (
+              <button
+                onClick={() => { setPaymentDueDay(null); setPaymentDueLastDay(false); setUseCustomDueDay(false); setCustomDueDay('') }}
+                style={{
+                  background: 'none', border: 'none', padding: '0 2px',
+                  fontSize: 12, color: 'var(--ink-4)', cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                ล้าง
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {QUICK_DUE_DAYS.map(d => (
+              <button
+                key={d}
+                onClick={() => { setPaymentDueDay(d); setPaymentDueLastDay(false); setUseCustomDueDay(false) }}
+                style={{
+                  minWidth: 36, height: 34, borderRadius: 8, padding: '0 10px',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                  background: (!useCustomDueDay && !paymentDueLastDay && paymentDueDay === d) ? 'var(--brand-50)' : 'var(--surface-2)',
+                  border: `1.5px solid ${(!useCustomDueDay && !paymentDueLastDay && paymentDueDay === d) ? 'var(--brand)' : 'transparent'}`,
+                  color: (!useCustomDueDay && !paymentDueLastDay && paymentDueDay === d) ? 'var(--brand-700)' : 'var(--ink-3)',
+                  transition: 'all .12s',
+                }}
+              >
+                {d}
+              </button>
+            ))}
+            <button
+              onClick={() => { setPaymentDueLastDay(true); setPaymentDueDay(null); setUseCustomDueDay(false) }}
+              style={{
+                minWidth: 52, height: 34, borderRadius: 8, padding: '0 10px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                background: paymentDueLastDay ? 'var(--brand-50)' : 'var(--surface-2)',
+                border: `1.5px solid ${paymentDueLastDay ? 'var(--brand)' : 'transparent'}`,
+                color: paymentDueLastDay ? 'var(--brand-700)' : 'var(--ink-3)',
+                transition: 'all .12s',
+              }}
+            >
+              สิ้นเดือน
+            </button>
+            <button
+              onClick={() => { setUseCustomDueDay(true); setPaymentDueLastDay(false) }}
+              style={{
+                minWidth: 52, height: 34, borderRadius: 8, padding: '0 10px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                background: useCustomDueDay ? 'var(--brand-50)' : 'var(--surface-2)',
+                border: `1.5px solid ${useCustomDueDay ? 'var(--brand)' : 'transparent'}`,
+                color: useCustomDueDay ? 'var(--brand-700)' : 'var(--ink-3)',
+                transition: 'all .12s',
+              }}
+            >
+              อื่นๆ
+            </button>
+          </div>
+
+          {useCustomDueDay && (
+            <div style={{
+              display: 'flex', alignItems: 'center', marginTop: 10,
+              border: '1.5px solid var(--line)', borderRadius: 12, background: 'var(--bg)',
+            }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="วันที่ 1–31"
+                value={customDueDay}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, '')
+                  if (!digits) { setCustomDueDay(''); return }
+                  setCustomDueDay(Number(digits) > 31 ? '31' : digits)
+                }}
                 autoFocus
                 style={{
                   flex: 1, padding: '13px 14px',
@@ -263,13 +402,14 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
         {/* Actions */}
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={cannotSave}
           style={{
             width: '100%', padding: 15, borderRadius: 999,
             background: 'var(--ink)', color: 'var(--bg)',
             border: 'none', fontSize: 15, fontWeight: 600,
-            fontFamily: 'inherit', cursor: saving ? 'not-allowed' : 'pointer',
-            letterSpacing: '-.2px', opacity: saving ? .6 : 1,
+            fontFamily: 'inherit',
+            cursor: cannotSave ? 'not-allowed' : 'pointer',
+            letterSpacing: '-.2px', opacity: cannotSave ? .6 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >

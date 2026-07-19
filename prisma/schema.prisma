@@ -91,7 +91,10 @@ model users_card {
   card_id           String?       @db.Uuid
   last_four         String?       @db.VarChar(4)
   credit_limit      Decimal?      @db.Decimal(12, 2)
-  billing_cycle_day Int?
+  billing_cycle_day    Int?
+  billing_last_day     Boolean?      @default(false)
+  payment_due_day      Int?
+  payment_due_last_day Boolean?      @default(false)
   created_date      DateTime      @default(now()) @db.Timestamptz(6)
   created_by        String?       @db.VarChar
   updated_date      DateTime?     @db.Timestamptz(6)
@@ -121,6 +124,7 @@ model merchants {
   name_th             String?               @db.VarChar
   name_eng            String?               @db.VarChar
   logo_url            String?
+  mcc_code            String?               @db.VarChar(4)
   category_id         String?               @db.Uuid
   created_date        DateTime              @default(now()) @db.Timestamptz(6)
   created_by          String?               @db.VarChar

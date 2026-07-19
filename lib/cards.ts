@@ -20,6 +20,9 @@ export interface UserCard {
   last_four: string | null
   credit_limit: string | null   // Prisma Decimal serialises to string
   billing_cycle_day: number | null
+  billing_last_day: boolean | null
+  payment_due_day: number | null
+  payment_due_last_day: boolean | null
   credit_cards: CreditCard | null
 }
 
@@ -55,6 +58,9 @@ export interface UpdateCardPayload {
   last_four?: string | null
   credit_limit?: number | null
   billing_cycle_day?: number | null
+  billing_last_day?: boolean | null
+  payment_due_day?: number | null
+  payment_due_last_day?: boolean | null
 }
 
 export async function updateCard(userCardId: string, payload: UpdateCardPayload): Promise<void> {

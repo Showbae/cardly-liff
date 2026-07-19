@@ -11,7 +11,6 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.126",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -32,6 +31,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
     "postinstall": "prisma generate"
   },
   "eslintConfig": {
@@ -54,12 +54,15 @@
   },
   "devDependencies": {
     "@prisma/client": "^7.8.0",
+    "@types/node": "^24.13.3",
     "autoprefixer": "^10.5.0",
     "concurrently": "^10.0.3",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.15",
     "prisma": "^7.8.0",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

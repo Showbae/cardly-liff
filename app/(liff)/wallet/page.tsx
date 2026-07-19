@@ -26,35 +26,70 @@ const BANK_GRADIENT: Record<string, string> = {
 
 const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
 
-function chipGradient(bankId?: string | null) {
+export function chipGradient(bankId?: string | null) {
   return BANK_GRADIENT[bankId ?? ''] ?? 'linear-gradient(135deg, #2a3a33, #0c1612)'
 }
-function bankInitial(bank?: { initial?: string | null; id?: string } | null) {
+export function bankInitial(bank?: { initial?: string | null; id?: string } | null) {
   return bank?.initial ?? bank?.id?.charAt(0) ?? '?'
 }
 
-function nearestBillingDate(cards: UserCard[]): string | null {
+export function nearestBillingDate(cards: UserCard[]): string | null {
   const now = new Date()
   let nearest: Date | null = null
   for (const uc of cards) {
-    if (!uc.billing_cycle_day) continue
-    const day = uc.billing_cycle_day
-    let candidate = new Date(now.getFullYear(), now.getMonth(), day)
-    if (candidate <= now) candidate = new Date(now.getFullYear(), now.getMonth() + 1, day)
+    let candidate: Date
+    if (uc.billing_last_day) {
+      // last day of current month; if already past, last day of next month
+      candidate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      if (candidate <= now) candidate = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+    } else if (uc.billing_cycle_day) {
+      const day = uc.billing_cycle_day
+      candidate = new Date(now.getFullYear(), now.getMonth(), day)
+      if (candidate <= now) candidate = new Date(now.getFullYear(), now.getMonth() + 1, day)
+    } else {
+      continue
+    }
     if (!nearest || candidate < nearest) nearest = candidate
   }
   if (!nearest) return null
   return `${nearest.getDate()} ${THAI_MONTHS[nearest.getMonth()]}`
 }
 
-function totalCreditLimit(cards: UserCard[]): number {
+export function nearestDueDate(cards: UserCard[]): string | null {
+  const now = new Date()
+  let nearest: Date | null = null
+  for (const uc of cards) {
+    let candidate: Date
+    if (uc.payment_due_last_day) {
+      candidate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      if (candidate <= now) candidate = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+    } else if (uc.payment_due_day) {
+      const day = uc.payment_due_day
+      const clamp = (y: number, m: number) =>
+        Math.min(day, new Date(y, m + 1, 0).getDate())
+      const cy = now.getFullYear(), cm = now.getMonth()
+      candidate = new Date(cy, cm, clamp(cy, cm))
+      if (candidate <= now) {
+        const next = new Date(cy, cm + 1, 1)
+        candidate = new Date(next.getFullYear(), next.getMonth(), clamp(next.getFullYear(), next.getMonth()))
+      }
+    } else {
+      continue
+    }
+    if (!nearest || candidate < nearest) nearest = candidate
+  }
+  if (!nearest) return null
+  return `${nearest.getDate()} ${THAI_MONTHS[nearest.getMonth()]}`
+}
+
+export function totalCreditLimit(cards: UserCard[]): number {
   return cards.reduce((sum, uc) => {
     const v = Number(uc.credit_limit ?? 0)
     return sum + (isNaN(v) ? 0 : v)
   }, 0)
 }
 
-function formatBaht(amount: number): string {
+export function formatBaht(amount: number): string {
   return '฿' + amount.toLocaleString('th-TH', { maximumFractionDigits: 0 })
 }
 
@@ -139,6 +174,7 @@ export default function WalletPage() {
   const hasCards = myCards.length > 0
   const limitTotal = totalCreditLimit(myCards)
   const nextBilling = nearestBillingDate(myCards)
+  const nextDue = nearestDueDate(myCards)
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
@@ -182,10 +218,20 @@ export default function WalletPage() {
                   {limitTotal > 0 ? formatBaht(limitTotal) : '—'}
                 </div>
               </div>
-              {nextBilling && (
-                <div className="text-right">
-                  <div className="text-[12px] text-ink-3">ตัดรอบถัดไป</div>
-                  <div className="text-[13px] font-semibold text-ink mt-0.5">{nextBilling}</div>
+              {(nextBilling || nextDue) && (
+                <div className="text-right flex gap-4">
+                  {nextBilling && (
+                    <div>
+                      <div className="text-[12px] text-ink-3">ตัดรอบถัดไป</div>
+                      <div className="text-[13px] font-semibold text-ink mt-0.5">{nextBilling}</div>
+                    </div>
+                  )}
+                  {nextDue && (
+                    <div>
+                      <div className="text-[12px] text-ink-3">ชำระถัดไป</div>
+                      <div className="text-[13px] font-semibold text-ink mt-0.5">{nextDue}</div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -201,7 +247,7 @@ export default function WalletPage() {
                 const card = uc.credit_cards
                 const bankId = card?.bank_id ?? ''
                 const bankName = card?.banks?.name_th ?? card?.banks?.name_eng ?? bankId
-                const hasMeta = !!(card?.card_tier || uc.last_four || uc.billing_cycle_day)
+                const hasMeta = !!(card?.card_tier || uc.last_four || uc.billing_cycle_day || uc.billing_last_day || uc.payment_due_day || uc.payment_due_last_day)
                 return (
                   <div
                     key={uc.id}
@@ -245,10 +291,20 @@ export default function WalletPage() {
                                 </span>
                               </>
                             )}
-                            {uc.billing_cycle_day && (
+                            {(uc.billing_cycle_day || uc.billing_last_day) && (
                               <>
                                 {(card?.card_tier || uc.last_four) && <span className="text-[11px] text-[var(--line)]">·</span>}
-                                <span className="text-[11px] text-ink-4">ตัดรอบ {uc.billing_cycle_day}</span>
+                                <span className="text-[11px] text-ink-4">
+                                  ตัดรอบ {uc.billing_last_day ? 'สิ้นเดือน' : uc.billing_cycle_day}
+                                </span>
+                              </>
+                            )}
+                            {(uc.payment_due_day || uc.payment_due_last_day) && (
+                              <>
+                                <span className="text-[11px] text-[var(--line)]">·</span>
+                                <span className="text-[11px] text-ink-4">
+                                  ชำระ {uc.payment_due_last_day ? 'สิ้นเดือน' : uc.payment_due_day}
+                                </span>
                               </>
                             )}
                           </>
