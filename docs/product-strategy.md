@@ -41,7 +41,7 @@
 | 5 | 💳 **Best Card Recommendation** (Rule-based) | 13 | Core value prop — "ควรรูดบัตรอะไร?" |
 | 6 | 🔔 **Promo Expiration Alert** | 8 | Retention hook — habit loop ให้ user เปิดแอพทุกวัน |
 
-### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 37 SP
+### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 50 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
@@ -49,6 +49,7 @@
 | 8 | 🎯 **Personalized Recommendation** (ML-based) | 13 | Upgrade rule → intelligence — "บัตร A ครบแล้ว switch ไป B ดีกว่า" |
 | 9 | ✅ **User Verified Promo** | 8 | Trust layer — community ยืนยันว่าโปรยังใช้ได้ไหม |
 | 10 | 💰 **Cashback & Spending Analytics** | 8 | Insight loop — "เดือนนี้ประหยัดได้ X บาท" สร้าง emotional reward |
+| 23 | 📋 **Card Profile & Benefits Summary** | 13 | Content layer — user เข้าใจบัตรตัวเองก่อนจะเชื่อคำแนะนำ และเป็น data foundation สำหรับ Feature #8 |
 
 ### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 99 SP
 
@@ -146,6 +147,14 @@
 - Breakdown ตาม category และตามบัตร
 - ข้อมูลอัปเดตตาม transaction ที่ user log ผ่านแอป (ไม่ต้องพึ่ง bank sync)
 
+**23. Card Profile & Benefits Summary**
+- แตะบัตรใน Wallet แล้วเห็น Card Profile — จุดเด่น + สิทธิ์ประโยชน์ทั้งหมดของบัตรใบนั้น
+- ข้อมูลแบ่งชัดเป็น 2 ประเภท: (ก) rate-based benefit (เช่น "cashback 5% ซูเปอร์, 2% ทั่วไป") และ (ข) perks เชิงคุณภาพ (เช่น "Airport lounge 2 ครั้ง/ปี", "Travel insurance สูงสุด 10M")
+- แสดงโปรที่ active อยู่ตอนนี้ที่เกี่ยวกับบัตรนี้ควบคู่กัน (ดึงจาก promotions table)
+- Admin portal มีหน้า/form สำหรับกรอก/แก้ไข benefit และ perks ต่อบัตร
+
+> ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
+
 ### P2 — Power Users
 
 **11. MCC Mapping Full v2**
@@ -219,11 +228,11 @@
 | Phase | Features | SP | Timeline |
 |-------|---------|:--:|----------|
 | Phase 1: Foundation | #1–6 | 76 | 0–3 เดือน |
-| Phase 2: Core Loop | #7–10 | 37 | 3–6 เดือน |
+| Phase 2: Core Loop | #7–10, #23 | 50 | 3–6 เดือน |
 | Phase 3: Power Users | #11–17 | 99 | 6–9 เดือน |
 | Phase 4: AI Layer | #18–20 | 68 | 9–12 เดือน |
 | Phase 5: Platform | #21–22 | 76 | 12+ เดือน |
-| **รวม** | **22 features** | **356** | **~18 เดือน** |
+| **รวม** | **23 features** | **369** | **~18 เดือน** |
 
 > Velocity แนะนำ: 2-week sprint, 20–25 SP/sprint
 

@@ -1,10 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { initLiff, getLiffProfile } from '@/lib/liff'
 import { signInWithLine } from '@/lib/auth'
 import { getMyCards } from '@/lib/cards'
+import { SearchOverlay } from '@/components/liff/SearchOverlay'
+import { RecommendSheet } from '@/components/liff/RecommendSheet'
+
+interface MerchantInfo {
+  id: string
+  name_th: string | null
+  name_eng: string | null
+  categories: { name_th: string | null; name_eng: string | null; icon: string | null } | null
+}
 
 const CATEGORIES = [
   { emoji: '☕', label: 'คาเฟ่' },
@@ -14,8 +23,6 @@ const CATEGORIES = [
   { emoji: '🛍️', label: 'ช้อปปิ้ง' },
   { emoji: '🏥', label: 'โรงพยาบาล' },
 ]
-
-const RECENT_SEARCHES = ['Starbucks', 'PT Station', "Lotus's"]
 
 const URGENCY_ALERTS = [
   {
@@ -44,11 +51,28 @@ const URGENCY_ALERTS = [
   },
 ]
 
+const RECENTS_KEY = 'cardly-recent-searches'
+
+function loadHomeRecents(): string[] {
+  try { return JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]') } catch { return [] }
+}
+
 export default function HomePage() {
   const router = useRouter()
   const [firstName, setFirstName] = useState('')
   const [cardCount, setCardCount] = useState<number | null>(null)
   const [authDone, setAuthDone] = useState(false)
+  const [userId, setUserId] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [homeRecents, setHomeRecents] = useState<string[]>([])
+  const overlayInputRef = useRef<HTMLInputElement>(null)
+  const [selectedMerchant, setSelectedMerchant] = useState<MerchantInfo | null>(null)
+  const [recommendOpen, setRecommendOpen] = useState(false)
+
+  function openSearch() {
+    overlayInputRef.current?.focus({ preventScroll: true })
+    setSearchOpen(true)
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -65,6 +89,7 @@ export default function HomePage() {
             })
           : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀' }
 
+        setUserId(dbUser.id)
         setFirstName(dbUser.display_name.split(' ')[0])
         const cards = await getMyCards(dbUser.id)
         setCardCount(cards.length)
@@ -76,6 +101,32 @@ export default function HomePage() {
     }
     init()
   }, [])
+
+  useEffect(() => {
+    setHomeRecents(loadHomeRecents())
+  }, [])
+
+  function handleSearchClose() {
+    setSearchOpen(false)
+    setHomeRecents(loadHomeRecents())
+  }
+
+  function handleMerchantSelect(merchant: MerchantInfo) {
+    if (!authDone || !userId) return  // wait for auth before fetching recommendations
+    setSelectedMerchant(merchant)
+    setRecommendOpen(true)
+  }
+
+  function handleRecommendClose() {
+    setRecommendOpen(false)
+    setTimeout(() => setSelectedMerchant(null), 320)  // clear after slide-out animation
+  }
+
+  function handleBackToSearch() {
+    setRecommendOpen(false)
+    setTimeout(() => setSelectedMerchant(null), 320)
+    setSearchOpen(true)
+  }
 
   return (
     <div className="min-h-screen bg-bg">
@@ -110,7 +161,8 @@ export default function HomePage() {
 
         {/* ── Zone 1 · Search Hero ─────────────────── */}
         <div
-          className="flex items-center gap-[11px] px-4 py-[15px] bg-surface border-[1.5px] border-line shadow-depth-md mt-3"
+          onClick={openSearch}
+          className="flex items-center gap-[11px] px-4 py-[15px] bg-surface border-[1.5px] border-line shadow-depth-md mt-3 cursor-pointer"
           style={{ borderRadius: 'var(--r-lg)' }}
         >
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--brand-700)"
@@ -148,11 +200,13 @@ export default function HomePage() {
         </div>
 
         {/* Recent searches */}
+        {homeRecents.length > 0 && (
         <div className="flex items-center gap-1.5 mt-[14px] flex-wrap">
           <span className="text-[11px] text-ink-4">ล่าสุด</span>
-          {RECENT_SEARCHES.map(q => (
+          {homeRecents.map(q => (
             <button
               key={q}
+              onClick={openSearch}
               className="inline-flex items-center gap-1 text-[12px] font-medium px-[11px] py-[5px] rounded-full bg-surface-2 text-ink-2"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -164,6 +218,7 @@ export default function HomePage() {
             </button>
           ))}
         </div>
+        )}
 
         {/* ── Zone 2 · ต้องรีบ ─────────────────────── */}
         <div className="flex justify-between items-center mt-[18px] mb-2 mx-0.5">
@@ -242,6 +297,20 @@ export default function HomePage() {
         </div>
 
       </div>
+
+      <SearchOverlay
+        ref={overlayInputRef}
+        open={searchOpen}
+        onClose={handleSearchClose}
+        onSelect={handleMerchantSelect}
+      />
+      <RecommendSheet
+        merchant={selectedMerchant}
+        userId={userId}
+        open={recommendOpen}
+        onClose={handleRecommendClose}
+        onBackToSearch={handleBackToSearch}
+      />
     </div>
   )
 }

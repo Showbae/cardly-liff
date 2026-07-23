@@ -62,6 +62,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Eliminate 300ms tap delay on mobile */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
 /* Hide scrollbar utility */
 .scrollbar-none {
   scrollbar-width: none;
