@@ -246,6 +246,93 @@
 
 ---
 
+## 🥊 Competitive Analysis — เหมียวจด vs ป้านวล vs Cardly
+
+> อัปเดต: 24 กรกฎาคม 2026 — วิเคราะห์คู่แข่ง 2 เจ้าในตลาด personal finance ไทย
+
+### คู่แข่งคือใคร
+
+| | **เหมียวจด (MeowJot)** | **ป้านวล (Parnuan)** | **Cardly (เรา)** |
+|---|---|---|---|
+| **เจ้าของ** | KBTG (กสิกร) | Startup อิสระ | — |
+| **แพลตฟอร์ม** | Native app (iOS/Android) | LINE chatbot (ไม่ต้องโหลดแอป) | LINE LIFF (ไม่ต้องโหลดแอป) |
+| **Core job** | จดรายจ่าย **อัตโนมัติจากสลิป/บิล** | จดรายจ่าย **ด้วยการพิมพ์ในแชท** | **แนะนำบัตรที่คุ้มสุดก่อนรูด** |
+| **ทิศเวลา** | 🔙 Backward — "จ่ายอะไรไปแล้ว" | 🔙 Backward — "จ่ายอะไรไปแล้ว" | 🔜 Forward — "ควรจ่ายด้วยบัตรไหน" |
+| **Input** | อัปโหลด/แชร์สลิป (16 แอปธนาคาร), PDF บิลบัตร (7 ผู้ให้บริการ) | พิมพ์ข้อความ เช่น "กาแฟ 50" | เลือกร้าน/หมวด → ระบบคิด net reward |
+| **บัตรเครดิต** | เก็บ**ยอด/ค่างวด/ดอกเบี้ย** จากบิล (bookkeeping) | ไม่มี | **catalog + สิทธิ์ + คำนวณคุ้มสุด** (advisory) |
+| **โปรโมชัน** | ❌ ไม่มี | ❌ ไม่มี | ✅ Core (Promo DB, alert, stacking) |
+| **Business model** | Freemium + Subscription | ฟรี | TBD |
+| **Scale** | KBTG backing, distribution แข็ง | ผู้ใช้ 300k+, 10M+ รายการ | Pre-launch |
+
+### 🎯 Positioning — Cardly อยู่ตรงไหน
+
+สองแกนที่แยกตลาด:
+
+```
+                  ADVISORY (คิดแทน / ตัดสินใจ)
+                          ▲
+                          │
+                    ● Cardly
+                          │
+   MANUAL ────────────────┼──────────────── AUTOMATED
+   (พิมพ์เอง)              │              (อ่านสลิป/บิลเอง)
+                          │
+        ● ป้านวล          │          ● เหมียวจด
+                          │
+                          ▼
+                  BOOKKEEPING (บันทึกย้อนหลัง)
+```
+
+- คู่แข่งทั้งคู่แข่งกันในควอดรันต์ **Bookkeeping** (จดว่าจ่ายอะไรไปแล้ว) — ต่างกันแค่ manual (ป้านวล) vs automated (เหมียวจด)
+- **Cardly เล่นคนละเกม:** ควอดรันต์ **Advisory** — ช่วย "ตัดสินใจก่อนจ่าย" ไม่ใช่ "บันทึกหลังจ่าย" ตรงกับ Vision "Google Maps สำหรับการใช้บัตร" (line 10)
+
+### 🕳️ ช่องว่างตลาด (White Space) ที่ Cardly ยึดได้
+
+1. **ไม่มีใครทำ "บัตรไหนคุ้มสุด"** — ทั้ง 2 เจ้าเป็น expense tracker ล้วน ไม่มี net-reward optimization → นี่คือ Core value ของ Cardly (Feature #5, #8, #13, #15) และเป็น moat ที่ลอกยาก
+2. **ไม่มีใครทำ Promo intelligence** — ทั้ง 2 เจ้าไม่แตะโปรโมชันเลย → ตรงกับ pain point ของ community "ล่าโปรบัตรเครดิต" ที่เป็นต้นทางของโปรเจกต์ (line 3)
+3. **ป้านวลพิสูจน์แล้วว่า LINE-native ตลาดรับ** (300k+ users ไม่ต้องโหลดแอป) → validate การเดิมพันเลือก LIFF ของเรา ลด adoption friction เทียบเหมียวจดที่ต้องโหลด app
+4. **Health/Medical + Travel/Miles ยังว่าง** — ไม่มีเจ้าไหน serve segment 3 (Travel Hacker) หรือ 6 (Health Payer) → Cardly Feature #12, #14, #16 ยึดพื้นที่นี้ได้
+
+### ⚠️ ภัยคุกคาม (ต้องระวัง)
+
+- **เหมียวจดมี KBTG หนุนหลัง** — distribution + ความน่าเชื่อถือด้านการเงินสูงกว่ามาก ถ้าเขา "ขยับขึ้น Advisory" (เพิ่มแนะนำบัตร) จะกินตลาดเราตรงๆ → เราต้องวิ่งให้ถึง Advisory moat ก่อน และลึกกว่า (stacking, community-verified)
+- **ป้านวลมี habit loop ที่แข็ง** — user จดทุกวันผ่านแชท → ถ้าเราอยากได้ transaction data (จำเป็นสำหรับ #7, #8, #10) ต้องสร้าง input ที่ "ง่ายเท่าพิมพ์ในแชท" ไม่งั้นแพ้เรื่อง data capture
+
+---
+
+## 💡 Feature Inspiration จากคู่แข่ง → แมปเข้า Roadmap
+
+> หลักการ: **ลอก mechanic ที่ดี แต่เอามารับใช้ Advisory job ของเรา** ไม่ใช่กลายเป็น expense tracker อีกตัว
+
+| # | แรงบันดาลใจจาก | Mechanic | แมปเข้า Feature | Phase | หมายเหตุ / ปรับใช้ |
+|---|---|---|---|:--:|---|
+| A | 🐱 เหมียวจด | อ่านสลิปโอน → transaction อัตโนมัติ | **#21 Statement OCR** (มีอยู่แล้ว) | **P4** | ตรงกับที่วางไว้ — แต่ใช้เพื่อ feed #7/#10 (data สำหรับ threshold + analytics) ไม่ใช่แค่ bookkeeping |
+| B | 🐱 เหมียวจด | อัปโหลด PDF บิลบัตร → ดึงยอด/ค่างวด | **#7 Benefit & Threshold Tracker** (มีอยู่แล้ว) | **P1** | บิลบัตรคือ input ที่แม่นสุดสำหรับ "ใช้ไปเท่าไหร่ เทียบ threshold" — พิจารณาดึง PDF-import เข้ามาเสริม #7 ให้ auto |
+| C | 🐱 เหมียวจด | ถ่าย/อัปโหลดรูป → parse ข้อมูล | **#19 Screenshot Promo Analyzer** (มีอยู่แล้ว) | **P3** | เหมียวจด parse สลิป, เรา parse **รูปโปร** → เป็น input engine ของ Promo DB |
+| D | 💬 ป้านวล | พิมพ์ในแชท LINE → บันทึกทันที (zero-friction) | **ใหม่: Quick-Log / Ask ผ่าน LINE Chat** | **P2–P3** | ดู "ข้อเสนอ" ด้านล่าง — เราอยู่บน LINE อยู่แล้ว ได้เปรียบทำ chat input โดยไม่ต้องออกจาก LIFF |
+| E | 💬 ป้านวล | ตั้งงบต่อหมวด + เตือน real-time | **#10 Cashback & Spending Analytics** (มีอยู่แล้ว) | **P2** | เสริมมุม "งบ/เตือน" เข้า analytics ที่วางไว้ |
+| F | 🐱 เหมียวจด | Freemium + Subscription | **Business model** (ยังไม่ระบุใน backlog) | — | ยืนยันว่าตลาดยอมจ่าย subscription สำหรับ finance tool → เก็บไว้พิจารณา monetization |
+
+### 💬 ข้อเสนอ feature ใหม่ (จากช่องว่าง "chat input" ของป้านวล)
+
+**Feature #24 (เสนอใหม่): Chat-based Quick Advisor** — *P2, ~8 SP*
+> "ก่อนจ่ายพิมพ์ถามป้า(บัตร)ได้เลย" — user พิมพ์ในแชท LINE เช่น *"Starbucks 200"* หรือ *"จะรูดโลตัส"* → ระบบตอบ **บัตรที่ควรรูด + เหตุผล (net reward)** ทันที
+
+- **ทำไม P2:** ต้องรอ #5 (Best Card Recommendation) + #3 (MCC Mapping) เสร็จก่อน เพราะ chat เป็นแค่ input layer ใหม่ที่ครอบ logic เดิม
+- **ทำไมสำคัญ:** ชนป้านวลตรงจุดแข็งที่สุด (zero-friction chat) แต่ให้ **คำแนะนำ (advisory)** แทนการจด (bookkeeping) → differentiator ชัด และเก็บ intent data ("user จะจ่ายที่ไหน") มาปรับ #8
+- **ได้เปรียบเชิงเทคนิค:** เราอยู่บน LINE ecosystem อยู่แล้ว ทำ LINE Messaging API + rich menu → LIFF ได้ทันที ไม่ต้องสร้างช่องทางใหม่
+
+> หมายเหตุ: หากรับ #24 เข้า backlog จริง ต้องอัปเดตตาราง Roadmap Summary (Phase 2) และ SP รวมด้วย — ปัจจุบันยังเป็น "ข้อเสนอ" รอ PO ตัดสิน
+
+### 📌 สรุปเชิงกลยุทธ์ (Takeaways)
+
+1. **อย่าไล่ตามเป็น expense tracker** — สนามนั้นมีเจ้าตลาดหนุนหลังธนาคารแล้ว เราชนะด้วย **Advisory ("คิดแทน")** ไม่ใช่ **Bookkeeping ("จดให้")**
+2. **เร่ง Advisory moat ให้ลึก** — #5 → #13/#15 (stacking) คือสิ่งที่คู่แข่งลอกยากสุด ทำก่อนเหมียวจดขยับ
+3. **ยืม zero-friction chat ของป้านวล มาเป็น input ให้ Advisory** (Feature #24) — ได้ทั้ง adoption และ data
+4. **OCR/สลิป (เหมียวจดถนัด) จัดไว้ท้าย roadmap ถูกแล้ว** — เป็น convenience layer ไม่ใช่ core value เรา ไม่ต้องรีบชน
+
+---
+
 ## 💡 Key Insights จาก Community Data
 
 - User ตื่นตีหนึ่งเพื่อกดโปร → **urgency สูงมาก, Notification timing สำคัญ**
