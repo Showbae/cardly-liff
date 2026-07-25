@@ -41,10 +41,11 @@
 | 5 | 💳 **Best Card Recommendation** (Rule-based) | 13 | Core value prop — "ควรรูดบัตรอะไร?" |
 | 6 | 🔔 **Promo Expiration Alert** | 8 | Retention hook — habit loop ให้ user เปิดแอพทุกวัน |
 
-### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 50 SP
+### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 58 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
+| 24 | 💬 **Chat-based Quick Advisor** ⏭️ NEXT | 8 | ⭐ Priority ถัดไป — พิมพ์ในแชท LINE "Starbucks 200" → ตอบบัตรที่ควรรูดทันที (channel ③, ยืม zero-friction ป้านวล). Dep: #3, #5 |
 | 7 | 📅 **Benefit & Threshold Tracker** | 8 | ปิด pain point Cashback Optimizer — "ใช้ไปเท่าไหร่แล้ว เหลืออีกเท่าไหรถึงครบ?" |
 | 8 | 🎯 **Personalized Recommendation** (ML-based) | 13 | Upgrade rule → intelligence — "บัตร A ครบแล้ว switch ไป B ดีกว่า" |
 | 9 | ✅ **User Verified Promo** | 8 | Trust layer — community ยืนยันว่าโปรยังใช้ได้ไหม |
@@ -155,6 +156,14 @@
 
 > ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
 
+**24. Chat-based Quick Advisor** *(⏭️ NEXT UP)*
+- user พิมพ์ข้อความในแชท LINE (เช่น "Starbucks 200" หรือ "จะรูดโลตัส") แล้วระบบตอบบัตรที่ควรรูด + เหตุผล (net reward) ได้ถูกต้อง โดยเรียกใช้ logic เดียวกับ #5 (ไม่เขียน logic แนะนำใหม่)
+- parse ข้อความเป็น (merchant/category + จำนวนเงิน ถ้ามี) ได้แม่นยำพอใช้งานจริง และถาม fallback เมื่อ resolve ร้านไม่ได้
+- หลังตอบ ให้ user กดยืนยัน "รูดด้วยบัตรนี้" เพื่อบันทึกเป็น transaction (`source = chat`, `status = estimated`) → ป้อน Job B ตาม Transaction Capture Strategy
+- ทำงานผ่าน LINE Messaging API webhook + deep link เข้า LIFF ได้เมื่อ user ต้องการรายละเอียดเพิ่ม
+
+> ⚠️ **Dependency:** ต้อง #3 (MCC Mapping) + #5 (Best Card Recommendation) พร้อมก่อน — ถ้ายังไม่เสร็จ chat จะไม่มี logic ให้เรียก
+
 ### P2 — Power Users
 
 **11. MCC Mapping Full v2**
@@ -228,11 +237,11 @@
 | Phase | Features | SP | Timeline |
 |-------|---------|:--:|----------|
 | Phase 1: Foundation | #1–6 | 76 | 0–3 เดือน |
-| Phase 2: Core Loop | #7–10, #23 | 50 | 3–6 เดือน |
+| Phase 2: Core Loop | #24, #7–10, #23 | 58 | 3–6 เดือน |
 | Phase 3: Power Users | #11–17 | 99 | 6–9 เดือน |
 | Phase 4: AI Layer | #18–20 | 68 | 9–12 เดือน |
 | Phase 5: Platform | #21–22 | 76 | 12+ เดือน |
-| **รวม** | **23 features** | **369** | **~18 เดือน** |
+| **รวม** | **24 features** | **377** | **~18 เดือน** |
 
 > Velocity แนะนำ: 2-week sprint, 20–25 SP/sprint
 
@@ -309,20 +318,19 @@
 | A | 🐱 เหมียวจด | อ่านสลิปโอน → transaction อัตโนมัติ | **#21 Statement OCR** (มีอยู่แล้ว) | **P4** | ตรงกับที่วางไว้ — แต่ใช้เพื่อ feed #7/#10 (data สำหรับ threshold + analytics) ไม่ใช่แค่ bookkeeping |
 | B | 🐱 เหมียวจด | อัปโหลด PDF บิลบัตร → ดึงยอด/ค่างวด | **#7 Benefit & Threshold Tracker** (มีอยู่แล้ว) | **P1** | บิลบัตรคือ input ที่แม่นสุดสำหรับ "ใช้ไปเท่าไหร่ เทียบ threshold" — พิจารณาดึง PDF-import เข้ามาเสริม #7 ให้ auto |
 | C | 🐱 เหมียวจด | ถ่าย/อัปโหลดรูป → parse ข้อมูล | **#19 Screenshot Promo Analyzer** (มีอยู่แล้ว) | **P3** | เหมียวจด parse สลิป, เรา parse **รูปโปร** → เป็น input engine ของ Promo DB |
-| D | 💬 ป้านวล | พิมพ์ในแชท LINE → บันทึกทันที (zero-friction) | **ใหม่: Quick-Log / Ask ผ่าน LINE Chat** | **P2–P3** | ดู "ข้อเสนอ" ด้านล่าง — เราอยู่บน LINE อยู่แล้ว ได้เปรียบทำ chat input โดยไม่ต้องออกจาก LIFF |
+| D | 💬 ป้านวล | พิมพ์ในแชท LINE → บันทึกทันที (zero-friction) | **#24 Chat-based Quick Advisor** ✅ รับเข้าแล้ว | **P1** | ⏭️ Priority ถัดไป — advisory ผ่านแชท (ไม่ใช่แค่ log) เก็บ intent เป็น channel ③ (ดูรายละเอียดด้านล่าง) |
 | E | 💬 ป้านวล | ตั้งงบต่อหมวด + เตือน real-time | **#10 Cashback & Spending Analytics** (มีอยู่แล้ว) | **P2** | เสริมมุม "งบ/เตือน" เข้า analytics ที่วางไว้ |
 | F | 🐱 เหมียวจด | Freemium + Subscription | **Business model** (ยังไม่ระบุใน backlog) | — | ยืนยันว่าตลาดยอมจ่าย subscription สำหรับ finance tool → เก็บไว้พิจารณา monetization |
 
-### 💬 ข้อเสนอ feature ใหม่ (จากช่องว่าง "chat input" ของป้านวล)
+### 💬 Feature #24 — Chat-based Quick Advisor ✅ รับเข้า Backlog แล้ว (⏭️ NEXT UP)
 
-**Feature #24 (เสนอใหม่): Chat-based Quick Advisor** — *P2, ~8 SP*
+**Feature #24: Chat-based Quick Advisor** — *P1 (Phase 2), 8 SP*
 > "ก่อนจ่ายพิมพ์ถามป้า(บัตร)ได้เลย" — user พิมพ์ในแชท LINE เช่น *"Starbucks 200"* หรือ *"จะรูดโลตัส"* → ระบบตอบ **บัตรที่ควรรูด + เหตุผล (net reward)** ทันที
 
-- **ทำไม P2:** ต้องรอ #5 (Best Card Recommendation) + #3 (MCC Mapping) เสร็จก่อน เพราะ chat เป็นแค่ input layer ใหม่ที่ครอบ logic เดิม
-- **ทำไมสำคัญ:** ชนป้านวลตรงจุดแข็งที่สุด (zero-friction chat) แต่ให้ **คำแนะนำ (advisory)** แทนการจด (bookkeeping) → differentiator ชัด และเก็บ intent data ("user จะจ่ายที่ไหน") มาปรับ #8
-- **ได้เปรียบเชิงเทคนิค:** เราอยู่บน LINE ecosystem อยู่แล้ว ทำ LINE Messaging API + rich menu → LIFF ได้ทันที ไม่ต้องสร้างช่องทางใหม่
-
-> หมายเหตุ: หากรับ #24 เข้า backlog จริง ต้องอัปเดตตาราง Roadmap Summary (Phase 2) และ SP รวมด้วย — ปัจจุบันยังเป็น "ข้อเสนอ" รอ PO ตัดสิน
+- **Dependency:** ต้องมี #5 (Best Card Recommendation) + #3 (MCC Mapping) เป็น logic แกนก่อน — chat เป็น input layer ใหม่ที่ครอบ logic เดิม (ไม่ได้เขียน logic แนะนำใหม่)
+- **ทำไมสำคัญ:** ชนป้านวลตรงจุดแข็งที่สุด (zero-friction chat) แต่ให้ **คำแนะนำ (advisory)** แทนการจด (bookkeeping) → differentiator ชัด + เก็บ intent data (Job B / channel ③) มาปรับ #8
+- **ได้เปรียบเชิงเทคนิค:** อยู่บน LINE ecosystem อยู่แล้ว — LINE Messaging API + rich menu → deep link เข้า LIFF ได้ทันที ไม่ต้องสร้างช่องทางใหม่
+- **สถานะ:** ✅ PO รับเข้า backlog แล้ว จัดเป็น **priority ถัดไป** — เป็น first pickup ของ Phase 2 หลัง P0 foundation (#3, #5) พร้อม
 
 ### 📌 สรุปเชิงกลยุทธ์ (Takeaways)
 
@@ -330,6 +338,76 @@
 2. **เร่ง Advisory moat ให้ลึก** — #5 → #13/#15 (stacking) คือสิ่งที่คู่แข่งลอกยากสุด ทำก่อนเหมียวจดขยับ
 3. **ยืม zero-friction chat ของป้านวล มาเป็น input ให้ Advisory** (Feature #24) — ได้ทั้ง adoption และ data
 4. **OCR/สลิป (เหมียวจดถนัด) จัดไว้ท้าย roadmap ถูกแล้ว** — เป็น convenience layer ไม่ใช่ core value เรา ไม่ต้องรีบชน
+
+---
+
+## 🔌 Transaction Capture & Reconciliation Strategy
+
+> สรุปการตัดสินใจ (24 ก.ค. 2026): Cardly ได้ข้อมูลรายจ่ายบัตรเครดิตเข้าระบบยังไง และจัดการยังไงเมื่อข้อมูลจากหลายแหล่งชนกัน
+> **บริบทสำคัญ:** การรูดบัตรเครดิต **ไม่เหลือ gallery slip** ให้อ่านแบบเหมียวจด (ต่างจากการโอน PromptPay) และ Cardly เป็น **LIFF (web)** จึงอ่าน push notification / SMS / email ของแอปอื่นไม่ได้ → ต้องออกแบบ capture เอง
+
+### 1. สอง data jobs (คนละความต้องการ ห้ามยำรวมกัน)
+
+| | **Job A — ครบ + แม่น** | **Job B — ทันเวลา** |
+|---|---|---|
+| Feature | สะสมไมล์ (#12), waive ค่าธรรมเนียมรายปี, ยอดที่ต้องจ่ายจริง | แนะนำบัตรตอนจะรูด (#5/#24), "อีก X ถึงครบโปร" (#7) |
+| Horizon | ทั้งปี / ทั้งรอบบิล | ณ วินาทีที่จะจ่าย |
+| ต้องการ | ครบถ้วน + แม่นยำ (ช้าได้) | เรียลไทม์ (ยอดคลาดนิดหน่อยรับได้) |
+| Primary source | **Statement (บิลรายเดือน)** | **intent-capture ณ จังหวะ advisory + manual** |
+
+> หลัก: **ไม่มี channel เดียวที่ทั้งครบและทันเวลา** → กำหนด primary channel **ต่อ job** ไม่ใช่หา pipeline เดียวรวบทุก feature
+
+### 2. ช่องทาง capture (5 ทาง) + รับใช้ job ไหน
+
+| ช่องทาง | รับใช้ | หมายเหตุ |
+|---|:--:|---|
+| ① กรอกผ่าน chat (LINE) | B | zero-friction แบบป้านวล |
+| ② เมนู form ใน LIFF | B | กรอกแบบมีโครงสร้าง |
+| ③ search ร้าน → แนะนำบัตร → กรอกเลย | B | 💎 **ตัวเด็ด** — capture ณ จังหวะ advisory ไม่มี friction เพิ่ม |
+| ④ อ่าน Statement รายเดือน | A | 🏆 authoritative source ของ Job A (granularity รายเดือน = พอสำหรับเป้าทั้งปี) |
+| ⑤ ถ่ายรูปสลิป/ใบเสร็จกระดาษ | A | friction สูง เสริมระหว่างรอ statement |
+
+> ❌ ตัดทิ้งสำหรับ LIFF: อ่าน push / SMS / email receipt ของแอปอื่น — web ทำไม่ได้ (ต้อง native + OS permission)
+
+### 3. Dedup = "Single Evolving Row"
+
+ปัญหา: user กรอก manual บางรายการ (เช่น 2–3) แล้ว upload statement (20) → เกิดรายการซ้ำ
+วิธีแก้: **ไม่สร้าง 2 แถวแล้วค่อยลบซ้ำ — ให้ manual entry "เลื่อนสถานะ" กลายเป็น statement เลย** → โครงสร้าง double-count ไม่ได้เพราะมีแค่แถวเดียว
+
+- manual entry เกิดเป็น `status = estimated`
+- ตอน import statement: วนเทียบ **เฉพาะ** รายการ `estimated` (ไม่กี่รายการ) กับ statement line ด้วย key → **บัตรเดียวกัน + ยอดตรง + txn date ห่าง ≤3 วัน** (tie-break: merchant fuzzy)
+  - **match** → เลื่อนแถวเป็น `confirmed`, ทับ amount/date ด้วยยอดจริงจาก bank, **เก็บ enrichment เดิม** (merchant / category / โปรที่ตั้งใจใช้)
+  - **ไม่ match** → insert แถวใหม่ `confirmed` (รายการที่เหลือ) แล้ว auto-enrich ผ่าน MCC
+- upload statement เดิมซ้ำ → กันด้วย `dedup_hash` (card + posting_date + amount + descriptor) unique → ข้ามรายการที่มีอยู่แล้ว
+
+### 4. Statement ชนะเสมอ + supersede (ขีดฆ่า ไม่ลบ)
+
+เมื่อ statement import ครบรอบ = **ground truth ของรอบนั้น**
+รายการ manual ที่ไม่ match ใครเลย → ตั้ง `status = superseded` (ไม่ `DELETE`)
+
+- **ทำไมไม่ลบ:** เก็บ audit trail + user กู้คืนได้ถ้า reconcile ผิด + ไม่ทำลาย reference โปร
+- **การนับยอด:** query `WHERE status != 'superseded'` → แถวที่ขีดฆ่าเหมือนไม่มีตัวตนในการคำนวณ แต่ยังอยู่ใน DB
+- **fuzzy amount** (±5% หรือ ±20 บาท) ใช้ **เฉพาะช่วยหา candidate** เท่านั้น — ถ้า ambiguous ค่อยถาม user
+
+### 5. เคส pending ข้ามรอบ (grace window)
+
+รอบบิลตัดตาม **posting date** ไม่ใช่ txn date → รายการรูด 30 ม.ค. อาจ post 2 ก.พ. → ไปโผล่ statement เดือน **ก.พ.** → กฎดิบ "statement ม.ค. ครบ → manual ที่ไม่ match = supersede" จะ **ขีดฆ่ารายการที่ถูกต้องทิ้ง**
+
+แก้ 3 ชั้น:
+1. **match ด้วย txn date ข้ามรอบได้** — statement ไทยแสดง txn date ด้วย → statement ก.พ. จะ claim manual entry 30 ม.ค. เอง (อย่าล็อค matching ไว้ในรอบเดียว)
+2. **settlement grace window** — รายการที่ txn date อยู่โซนขอบรอบ (≈5 วันก่อนตัด + 3 วันหลัง) → mark `pending_carryover`, **ห้าม supersede**, ยกไปรอ match กับ statement รอบถัดไป
+3. **supersede จริงต่อเมื่อ** — (ก) อยู่ลึกในรอบที่ import ครบ + ไม่ match (= mis-entry/refund จริง) หรือ (ข) ขอบรอบแต่รอครบอีก 1 รอบถัดไปแล้วยังไม่ match
+
+> user ไม่เคยอัป statement รอบถัดไปเลย → รายการค้างเป็น `estimated` ตลอด = ยอมรับได้ (เป็นแค่ยอดประมาณการ ไม่ทำใครพัง)
+
+### 6. Scoping — ออกแบบ schema ตอนนี้ / สร้าง engine ทีหลัง
+
+- **ทำตอนนี้ (ถูก):** ออกแบบตาราง `transactions` ให้พร้อม reconcile ตั้งแต่วันแรก
+  `status` (estimated \| confirmed \| superseded) · `source` (chat \| search \| form \| statement \| receipt) · `estimated_amount` · `dedup_hash` · `statement_batch_id` · `pending_carryover`
+  (เพิ่ม field เหล่านี้ทีหลัง = migration เจ็บ)
+- **เลื่อนไป P4 คู่กับ #21:** engine matching + grace window + supersede logic — ยังไม่จำเป็นจนกว่าจะมี statement import (เฟสแรกมีแต่ manual/chat ล้วน ยังไม่มีอะไรให้ชน)
+
+> ✅ **codebase ยืนยัน:** ยังไม่มีตาราง `transactions`; และ `users_card` มี `billing_cycle_day` / `payment_due_day` / `last_four` พร้อมใช้กำหนดขอบรอบบิลแล้ว
 
 ---
 
