@@ -41,18 +41,19 @@
 | 5 | 💳 **Best Card Recommendation** (Rule-based) | 13 | Core value prop — "ควรรูดบัตรอะไร?" |
 | 6 | 🔔 **Promo Expiration Alert** | 8 | Retention hook — habit loop ให้ user เปิดแอพทุกวัน |
 
-### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 58 SP
+### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 71 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
-| 24 | 💬 **Chat-based Quick Advisor** ⏭️ NEXT | 8 | ⭐ Priority ถัดไป — พิมพ์ในแชท LINE "Starbucks 200" → ตอบบัตรที่ควรรูดทันที (channel ③, ยืม zero-friction ป้านวล). Dep: #3, #5 |
+| 25 | 🗄️ **Transaction Ledger** (infra) ⏫ | 13 | Root dependency ของ #7/#8/#10/#24 — ตาราง `transactions` + field reconcile (ยังไม่มีในระบบ) ต้องมาก่อน #24 |
+| 24 | 💬 **Chat-based Quick Advisor** ⏭️ NEXT | 8 | ⭐ Priority ถัดไป — พิมพ์ในแชท LINE "Starbucks 200" → ตอบบัตรที่ควรรูดทันที (channel ③, ยืม zero-friction ป้านวล). Dep: #3, #5, #25 |
 | 7 | 📅 **Benefit & Threshold Tracker** | 8 | ปิด pain point Cashback Optimizer — "ใช้ไปเท่าไหร่แล้ว เหลืออีกเท่าไหรถึงครบ?" |
 | 8 | 🎯 **Personalized Recommendation** (ML-based) | 13 | Upgrade rule → intelligence — "บัตร A ครบแล้ว switch ไป B ดีกว่า" |
 | 9 | ✅ **User Verified Promo** | 8 | Trust layer — community ยืนยันว่าโปรยังใช้ได้ไหม |
 | 10 | 💰 **Cashback & Spending Analytics** | 8 | Insight loop — "เดือนนี้ประหยัดได้ X บาท" สร้าง emotional reward |
 | 23 | 📋 **Card Profile & Benefits Summary** | 13 | Content layer — user เข้าใจบัตรตัวเองก่อนจะเชื่อคำแนะนำ และเป็น data foundation สำหรับ Feature #8 |
 
-### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 99 SP
+### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 107 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
@@ -63,6 +64,7 @@
 | 15 | 🧮 **Promo Stacking Simulator** | 21 | Killer feature สำหรับ Hardcore — ต้องรอ Promo DB ครบ + MCC แม่นก่อน |
 | 16 | 🏥 **Health & Medical Card Tracker** | 5 | Underserved segment — ค่า รพ. 120k+ SP น้อย ทำได้ระหว่าง Phase 3 |
 | 17 | ⭐ **Merchant Review** | 13 | Community moat — ต้องรอมี user base ก่อน |
+| 26 | 🔁 **Recurring Bill → Best Card** | 8 | ยืมจากป้านวล — advisory บนบิลประจำ + auto feed ยอดเข้า #7 (ไม่ต้องกรอกซ้ำทุกเดือน) |
 
 ### 🔵 P3 — AI Layer (Phase 4: 9–12 เดือน) | 68 SP
 
@@ -156,6 +158,14 @@
 
 > ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
 
+**25. Transaction Ledger (infra)** *(⏫ ต้องมาก่อน #24)*
+- มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร พร้อม field รองรับ reconcile: `status` (estimated\|confirmed\|superseded), `source`, `estimated_amount`, `dedup_hash`, `statement_batch_id`, `pending_carryover`
+- มี API บันทึก transaction จาก channel ①②③ (chat/form/search) เป็น `status = estimated`
+- คำนวณยอดสะสมต่อบัตร/หมวด/รอบบิลได้ (query `WHERE status != 'superseded'`) เพื่อป้อน #7/#8/#10
+- Supabase RLS: user เห็นเฉพาะ transaction ของตัวเอง
+
+> ℹ️ engine matching / grace window / supersede logic **ยังไม่ทำในเฟสนี้** — เลื่อนไปคู่กับ #21 (P4) ตาม Transaction Capture Strategy; เฟสนี้แค่วาง schema + write path ให้ครบ
+
 **24. Chat-based Quick Advisor** *(⏭️ NEXT UP)*
 - user พิมพ์ข้อความในแชท LINE (เช่น "Starbucks 200" หรือ "จะรูดโลตัส") แล้วระบบตอบบัตรที่ควรรูด + เหตุผล (net reward) ได้ถูกต้อง โดยเรียกใช้ logic เดียวกับ #5 (ไม่เขียน logic แนะนำใหม่)
 - parse ข้อความเป็น (merchant/category + จำนวนเงิน ถ้ามี) ได้แม่นยำพอใช้งานจริง และถาม fallback เมื่อ resolve ร้านไม่ได้
@@ -201,6 +211,12 @@
 - แสดง average rating + จำนวนรีวิวบน merchant detail
 - มีระบบป้องกัน spam/fake review เบื้องต้น (เช่น 1 user 1 review ต่อร้าน)
 
+**26. Recurring Bill → Best Card**
+- user ตั้งบิล/subscription ประจำได้ (ชื่อ, ยอด, รอบ, หมวด) เช่น Netflix, ค่าไฟ, ประกัน
+- ระบบแนะนำบัตรที่คุ้มสุดสำหรับบิลนั้น (เรียก logic #5) + เตือนก่อนถึงรอบ
+- ทุกครั้งที่ถึงรอบ auto สร้าง transaction (`source = recurring`, `status = estimated`) → ป้อนยอดสะสมเข้า #7 โดยไม่ต้องกรอกซ้ำทุกเดือน
+- user แก้ไข/ยกเลิก recurring ได้
+
 ### P3 — AI Layer
 
 **18. AI Ask Assistant**
@@ -237,11 +253,11 @@
 | Phase | Features | SP | Timeline |
 |-------|---------|:--:|----------|
 | Phase 1: Foundation | #1–6 | 76 | 0–3 เดือน |
-| Phase 2: Core Loop | #24, #7–10, #23 | 58 | 3–6 เดือน |
-| Phase 3: Power Users | #11–17 | 99 | 6–9 เดือน |
+| Phase 2: Core Loop | #25, #24, #7–10, #23 | 71 | 3–6 เดือน |
+| Phase 3: Power Users | #11–17, #26 | 107 | 6–9 เดือน |
 | Phase 4: AI Layer | #18–20 | 68 | 9–12 เดือน |
 | Phase 5: Platform | #21–22 | 76 | 12+ เดือน |
-| **รวม** | **24 features** | **377** | **~18 เดือน** |
+| **รวม** | **26 features** | **398** | **~18 เดือน** |
 
 > Velocity แนะนำ: 2-week sprint, 20–25 SP/sprint
 
@@ -408,6 +424,32 @@
 - **เลื่อนไป P4 คู่กับ #21:** engine matching + grace window + supersede logic — ยังไม่จำเป็นจนกว่าจะมี statement import (เฟสแรกมีแต่ manual/chat ล้วน ยังไม่มีอะไรให้ชน)
 
 > ✅ **codebase ยืนยัน:** ยังไม่มีตาราง `transactions`; และ `users_card` มี `billing_cycle_day` / `payment_due_day` / `last_four` พร้อมใช้กำหนดขอบรอบบิลแล้ว
+
+---
+
+## 💳 Monetization / Pricing Strategy
+
+> Validate จากตลาด: ป้านวล (Pro / Pro Max) + เหมียวจด (subscription) พิสูจน์แล้วว่า **คนไทยยอมจ่าย subscription ให้ finance tool**
+> หลักการ Cardly: **gate ที่ "advisory moat" ไม่ใช่ "bookkeeping"** — ตรงข้ามคู่แข่งที่ gate เรื่องจด/รายงาน/OCR เพราะสิ่งที่คู่แข่งลอกเราไม่ได้คือ "การคิดแทน"
+
+| Tier | ปลดล็อก (draft) |
+|---|---|
+| **Free** | บัตร ≤ 3 ใบ · แนะนำบัตรพื้นฐาน (#5) · promo alert (#6) · chat advisor พื้นฐาน (#24) |
+| **Pro** | บัตรไม่จำกัด · Personalized Recommendation (#8) · Threshold/Miles tracker เต็ม (#7/#12) · analytics เชิงลึก + export (#10) |
+| **Pro Max** | 🧮 Promo Stacking Simulator (#15) · Split Bill Optimizer (#13) · AI Ask (#18) / AI Feed (#20) · multi-wallet / family |
+
+> ⚠️ ตัวเลขราคา + รายละเอียด tier **ยังไม่ล็อก** — รอ validate ราคาป้านวลจริง (ดึงหน้า pricing ไม่ได้ ปัจจุบันเว็บบล็อก bot) + สำรวจ willingness-to-pay ก่อนกำหนดจริง
+
+---
+
+## 🔮 Parking Lot (พิจารณาภายหลัง — ยังไม่ commit SP)
+
+Candidate จาก competitive analysis ที่ยังไม่รับเข้า backlog:
+
+- 📄 **แยก #21** — Manual Statement Upload (ก่อน, Job A) ↔ OCR อัตโนมัติ (ท้าย) → ดึง manual upload ขึ้น P2 ได้ถ้าไมล์/ค่าธรรมเนียมรายปีเป็น priority
+- 📤 **Export CSV/Excel** — enhancement ของ #10 (power user ชอบ)
+- 👛 **Multi-wallet / Family advisory** — segment ใหม่ (คู่รัก/ครอบครัวที่แชร์บัตร) เป็น big bet ไว้ phase หลัง
+- 🔴 **Savings Goals** — **ข้าม**: เป็น bookkeeping/PFM ล้วน หลุด core advisory ของเรา
 
 ---
 
