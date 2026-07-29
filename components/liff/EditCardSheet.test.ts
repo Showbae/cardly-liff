@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { chipGradient } from './EditCardSheet'
-import { chipGradient as chipGradientFromWallet } from '@/app/(liff)/wallet/page'
+import { chipGradient as chipGradientFromWallet } from '@/lib/card-utils'
 
 describe('chipGradient (components/liff/EditCardSheet.tsx — duplicate copy)', () => {
   it('returns the exact mapped gradient for a known bankId', () => {

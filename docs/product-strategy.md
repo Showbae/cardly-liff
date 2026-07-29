@@ -238,6 +238,70 @@
 
 ---
 
+## 💰 Monetization — Free vs Premium
+
+### Model
+- **รายเดือน + รายปี** (ไม่มี one-time)
+- **Launch timing**: หลัง Phase 3+ เมื่อ AI feature พร้อม (value prop แข็งพอ)
+- **Early access**: อาจเปิด beta subscription ตั้งแต่ Phase 2 ในราคาถูก/ฟรี เพื่อ validate willingness to pay
+
+### Feature Gating
+
+| Feature | Free | Premium |
+|---------|------|---------|
+| My Cards Wallet | **จำกัด 3 ใบ** | ไม่จำกัด |
+| Card Nickname | ชื่อย่ออัตโนมัติ | ตั้งเองได้ |
+| Promo Database | ✅ เต็ม | ✅ เต็ม |
+| Merchant Search | ✅ | ✅ |
+| Best Card Rec (Rule-based) | ✅ อันดับ 1 | full ranking + เหตุผล |
+| **Threshold Tracker** | ❌ | ✅ |
+| Personalized Rec (ML/AI) | ❌ | ✅ |
+| Spending Analytics | รายเดือนรวม | breakdown + history + export |
+| User Verified Promo | ✅ | ✅ |
+| Merchant Review | ✅ | ✅ |
+| Card Profile & Benefits | ✅ | ✅ |
+| Promo Expiration Alert | basic | advanced + threshold alert |
+| Split Bill Optimizer | ❌ | ✅ |
+| Promo Stacking Simulator | ❌ | ✅ |
+| Miles & Points Aggregator | ❌ | ✅ |
+| Travel Card Advisor | 1 ประเทศ | ไม่จำกัด |
+| AI Ask Assistant | ❌ | ✅ |
+| Screenshot Promo Analyzer | ❌ | ✅ |
+| Statement OCR | ❌ | ✅ |
+| AI Recommendation Feed | ❌ | ✅ |
+| Export CSV | ❌ | ✅ |
+| Early access features | ❌ | ✅ |
+
+### Conversion Hooks (เรียงตามพลัง)
+
+1. **Card limit 3 ใบ** — Hardcore Gamer ชนทันที ไม่ต้องโน้มน้าว
+2. **Threshold Tracker** — free user เห็นว่าตัวเองพลาด cashback เพราะไม่รู้ยอด → FOMO สูง
+3. **Split Bill + Stacking Simulator** — จ่ายเพื่อ save เงินจริง ROI ชัดเจน
+
+### Nickname เมื่อ Subscription หมด
+- ข้อมูล nickname ไม่ถูกลบ
+- ยังแสดงชื่อ nickname ใน LINE chat ตามปกติ
+- แต่ **lock การแก้ไข** จนกว่าจะต่ออายุ
+
+---
+
+## 📊 Threshold Tracker — คืออะไร
+
+บัตรเครดิตมี condition ซ่อนอยู่ใน benefit เช่น:
+> "cashback 5% ซูเปอร์ สูงสุด ฿300/เดือน" — พอใช้ไป ฿6,000 แล้วรูดต่อ = ได้ ฿0 เพิ่ม
+
+**ปัญหา:** user ไม่รู้ว่าชน cap แล้ว หรือใกล้ถึง threshold ที่จะ unlock double points
+
+**Tracker แสดง:**
+```
+KBank Sig — cashback ซูเปอร์
+████████░░  ฿240 / ฿300 (cap)  → ควร switch ไป SCB หลังใช้อีก ฿60
+```
+
+**ทำไมสำคัญ:** นี่คือ data ที่ทำให้ AI recommendation ฉลาดขึ้น — รู้ว่าบัตรไหน "เต็ม" แล้ว ณ ขณะนั้น ไม่ใช่แค่ rule ตายตัวว่าบัตรไหนให้ % สูงสุด
+
+---
+
 ## 🧠 Prioritization Principles
 
 1. **Dependency First** — Infrastructure ก่อน feature เสมอ แม้ user มองไม่เห็น

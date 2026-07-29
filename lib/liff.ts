@@ -1,8 +1,15 @@
 import liff from '@line/liff'
 
-export const initLiff = async () => {
-  if (typeof window === 'undefined') return
-  await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! })
+let initPromise: Promise<void> | null = null
+
+// Shared across all callers so liff.init() only ever runs once per page load —
+// calling it concurrently from multiple components can race and leave later callers stuck.
+export const initLiff = (): Promise<void> => {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (!initPromise) {
+    initPromise = liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! })
+  }
+  return initPromise
 }
 
 export const getLiffProfile = async () => {

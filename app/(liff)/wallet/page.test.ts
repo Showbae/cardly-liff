@@ -7,7 +7,7 @@ import {
   nearestDueDate,
   totalCreditLimit,
   formatBaht,
-} from './page'
+} from '@/lib/card-utils'
 
 function makeCard(overrides: Partial<UserCard> = {}): UserCard {
   return {
