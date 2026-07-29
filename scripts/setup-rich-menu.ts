@@ -121,7 +121,8 @@ async function uploadImage(richMenuId: string, image: Buffer): Promise<void> {
       Authorization: `Bearer ${TOKEN}`,
       'Content-Type': 'image/png',
     },
-    body: image,
+    // Buffer เป็น subclass ของ Uint8Array อยู่แล้ว แต่ type ของ fetch ไม่รับ Buffer ตรงๆ
+    body: new Uint8Array(image),
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`Upload ${res.status}: ${text}`)
