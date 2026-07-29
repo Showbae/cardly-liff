@@ -47,6 +47,15 @@ export async function addCard(userId: string, cardId: string): Promise<void> {
   if (!res.ok) throw new Error(`addCard failed: ${res.status}`)
 }
 
+export async function reorderCards(userId: string, cardIds: string[]): Promise<void> {
+  const res = await fetch('/api/cards/my/reorder', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, cardIds }),
+  })
+  if (!res.ok) throw new Error(`reorderCards failed: ${res.status}`)
+}
+
 export async function removeCard(userCardId: string): Promise<void> {
   const res = await fetch(`/api/cards/my/${encodeURIComponent(userCardId)}`, {
     method: 'DELETE',

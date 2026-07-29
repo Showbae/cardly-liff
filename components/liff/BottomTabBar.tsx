@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTabBarStore } from '@/stores/tabBarStore'
 
 const TABS = [
   {
@@ -56,6 +57,7 @@ const TABS = [
 
 export function BottomTabBar() {
   const pathname = usePathname()
+  const visible = useTabBarStore(state => state.visible)
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
@@ -64,7 +66,9 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 bg-surface border-t border-line"
+      className={`fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 bg-surface border-t border-line transition-transform duration-200 ease-out ${
+        visible ? 'translate-y-0' : 'translate-y-full'
+      }`}
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
     >
       {TABS.map(tab => {

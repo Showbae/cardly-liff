@@ -106,11 +106,6 @@ export default function HomePage() {
     setHomeRecents(loadHomeRecents())
   }, [])
 
-  function handleSearchClose() {
-    setSearchOpen(false)
-    setHomeRecents(loadHomeRecents())
-  }
-
   function handleMerchantSelect(merchant: MerchantInfo) {
     if (!authDone || !userId) return  // wait for auth before fetching recommendations
     setSelectedMerchant(merchant)
@@ -119,7 +114,12 @@ export default function HomePage() {
 
   function handleRecommendClose() {
     setRecommendOpen(false)
-    setTimeout(() => setSelectedMerchant(null), 320)  // clear after slide-out animation
+    setTimeout(() => setSelectedMerchant(null), 320)
+  }
+
+  function handleSearchClose() {
+    setSearchOpen(false)
+    setHomeRecents(loadHomeRecents())
   }
 
   function handleBackToSearch() {

@@ -15,13 +15,15 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "dotenv": "^17.4.2",
+    "framer-motion": "^12.43.0",
     "fuse.js": "^7.5.0",
     "next": "^16.2.6",
     "pg": "^8.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "web-vitals": "^2.1.4",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -33,6 +35,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
+    "setup:rich-menu": "tsx scripts/setup-rich-menu.ts",
     "postinstall": "prisma generate"
   },
   "eslintConfig": {
@@ -61,6 +64,7 @@
     "jsdom": "^29.1.1",
     "postcss": "^8.5.15",
     "prisma": "^7.8.0",
+    "puppeteer-core": "^25.3.0",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",

@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     const cards = await prisma.users_card.findMany({
       where: { user_id: userId },
       include: { credit_cards: { include: { banks: true } } },
+      orderBy: [{ sort_order: 'asc' }, { created_date: 'asc' }],
     })
 
     return NextResponse.json(cards)
@@ -37,10 +38,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { userId, cardId, last_four, credit_limit, billing_cycle_day, billing_last_day, payment_due_day, payment_due_last_day } = createSchema.parse(body)
 
+    const maxOrder = await prisma.users_card.aggregate({
+      where: { user_id: userId },
+      _max: { sort_order: true },
+    })
+
     await prisma.users_card.create({
       data: {
         user_id: userId,
         card_id: cardId,
+        sort_order: (maxOrder._max.sort_order ?? -1) + 1,
         ...(last_four != null && { last_four }),
         ...(credit_limit != null && { credit_limit }),
         ...(billing_cycle_day != null && { billing_cycle_day }),

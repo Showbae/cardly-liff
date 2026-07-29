@@ -169,6 +169,7 @@ export async function GET(req: NextRequest) {
         rank: i + 1,
         card: {
           id: r.userCard.credit_cards!.id,
+          usersCardId: r.userCard.id,
           card_name: r.userCard.credit_cards!.card_name,
           image_url: r.userCard.credit_cards!.image_url,
           last_four: r.userCard.last_four,
