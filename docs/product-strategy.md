@@ -41,17 +41,19 @@
 | 5 | 💳 **Best Card Recommendation** (Rule-based) | 13 | Core value prop — "ควรรูดบัตรอะไร?" |
 | 6 | 🔔 **Promo Expiration Alert** | 8 | Retention hook — habit loop ให้ user เปิดแอพทุกวัน |
 
-### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 50 SP
+### 🟠 P1 — Core Loop (Phase 2: 3–6 เดือน) | 71 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
+| 25 | 🗄️ **Transaction Ledger** (infra) ⏫ | 13 | Root dependency ของ #7/#8/#10/#24 — ตาราง `transactions` + field reconcile (ยังไม่มีในระบบ) ต้องมาก่อน #24 |
+| 24 | 💬 **Chat-based Quick Advisor** ⏭️ NEXT | 8 | ⭐ Priority ถัดไป — พิมพ์ในแชท LINE "Starbucks 200" → ตอบบัตรที่ควรรูดทันที (channel ③, ยืม zero-friction ป้านวล). Dep: #3, #5, #25 |
 | 7 | 📅 **Benefit & Threshold Tracker** | 8 | ปิด pain point Cashback Optimizer — "ใช้ไปเท่าไหร่แล้ว เหลืออีกเท่าไหรถึงครบ?" |
 | 8 | 🎯 **Personalized Recommendation** (ML-based) | 13 | Upgrade rule → intelligence — "บัตร A ครบแล้ว switch ไป B ดีกว่า" |
 | 9 | ✅ **User Verified Promo** | 8 | Trust layer — community ยืนยันว่าโปรยังใช้ได้ไหม |
 | 10 | 💰 **Cashback & Spending Analytics** | 8 | Insight loop — "เดือนนี้ประหยัดได้ X บาท" สร้าง emotional reward |
 | 23 | 📋 **Card Profile & Benefits Summary** | 13 | Content layer — user เข้าใจบัตรตัวเองก่อนจะเชื่อคำแนะนำ และเป็น data foundation สำหรับ Feature #8 |
 
-### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 99 SP
+### 🟡 P2 — Power Users (Phase 3: 6–9 เดือน) | 107 SP
 
 | # | Feature | SP | เหตุผล |
 |---|---------|:--:|--------|
@@ -62,6 +64,7 @@
 | 15 | 🧮 **Promo Stacking Simulator** | 21 | Killer feature สำหรับ Hardcore — ต้องรอ Promo DB ครบ + MCC แม่นก่อน |
 | 16 | 🏥 **Health & Medical Card Tracker** | 5 | Underserved segment — ค่า รพ. 120k+ SP น้อย ทำได้ระหว่าง Phase 3 |
 | 17 | ⭐ **Merchant Review** | 13 | Community moat — ต้องรอมี user base ก่อน |
+| 26 | 🔁 **Recurring Bill → Best Card** | 8 | ยืมจากป้านวล — advisory บนบิลประจำ + auto feed ยอดเข้า #7 (ไม่ต้องกรอกซ้ำทุกเดือน) |
 
 ### 🔵 P3 — AI Layer (Phase 4: 9–12 เดือน) | 68 SP
 
@@ -155,6 +158,24 @@
 
 > ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
 
+**25. Transaction Ledger (infra)** *(⏫ ต้องมาก่อน #24)*
+- ✅ มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร (`users_card_id`, `merchant_id`, `amount`, `spent_at`, `note`)
+- ✅ มี field reconcile เบื้องต้น: `is_reconciled` · `reconciled_at` · `external_ref` (apply เข้า DB จริงแล้ว)
+- ✅ มี write path จาก LIFF (`POST /api/transactions`) และ LINE chat (webhook)
+- ⬜ คำนวณยอดสะสมต่อบัตร/หมวด/รอบบิล เพื่อป้อน #7/#8/#10
+- ⬜ Supabase RLS: user เห็นเฉพาะ transaction ของตัวเอง
+
+> ℹ️ engine matching / grace window / supersede logic **ยังไม่ทำในเฟสนี้** — เลื่อนไปคู่กับ #21 (P4) ตาม Transaction Capture Strategy
+> ⚠️ **schema ปัจจุบันยังไม่รองรับกลไกเต็มรูปแบบ** — ดูหัวข้อ 6 ของ Transaction Capture Strategy ว่าขาดอะไรและต้องเพิ่มตอนไหน
+
+**24. Chat-based Quick Advisor** *(⏭️ NEXT UP)*
+- user พิมพ์ข้อความในแชท LINE (เช่น "Starbucks 200" หรือ "จะรูดโลตัส") แล้วระบบตอบบัตรที่ควรรูด + เหตุผล (net reward) ได้ถูกต้อง โดยเรียกใช้ logic เดียวกับ #5 (ไม่เขียน logic แนะนำใหม่)
+- parse ข้อความเป็น (merchant/category + จำนวนเงิน ถ้ามี) ได้แม่นยำพอใช้งานจริง และถาม fallback เมื่อ resolve ร้านไม่ได้
+- หลังตอบ ให้ user กดยืนยัน "รูดด้วยบัตรนี้" เพื่อบันทึกเป็น transaction (`source = chat`, `status = estimated`) → ป้อน Job B ตาม Transaction Capture Strategy
+- ทำงานผ่าน LINE Messaging API webhook + deep link เข้า LIFF ได้เมื่อ user ต้องการรายละเอียดเพิ่ม
+
+> ⚠️ **Dependency:** ต้อง #3 (MCC Mapping) + #5 (Best Card Recommendation) พร้อมก่อน — ถ้ายังไม่เสร็จ chat จะไม่มี logic ให้เรียก
+
 ### P2 — Power Users
 
 **11. MCC Mapping Full v2**
@@ -192,6 +213,12 @@
 - แสดง average rating + จำนวนรีวิวบน merchant detail
 - มีระบบป้องกัน spam/fake review เบื้องต้น (เช่น 1 user 1 review ต่อร้าน)
 
+**26. Recurring Bill → Best Card**
+- user ตั้งบิล/subscription ประจำได้ (ชื่อ, ยอด, รอบ, หมวด) เช่น Netflix, ค่าไฟ, ประกัน
+- ระบบแนะนำบัตรที่คุ้มสุดสำหรับบิลนั้น (เรียก logic #5) + เตือนก่อนถึงรอบ
+- ทุกครั้งที่ถึงรอบ auto สร้าง transaction (`source = recurring`, `status = estimated`) → ป้อนยอดสะสมเข้า #7 โดยไม่ต้องกรอกซ้ำทุกเดือน
+- user แก้ไข/ยกเลิก recurring ได้
+
 ### P3 — AI Layer
 
 **18. AI Ask Assistant**
@@ -228,17 +255,20 @@
 | Phase | Features | SP | Timeline |
 |-------|---------|:--:|----------|
 | Phase 1: Foundation | #1–6 | 76 | 0–3 เดือน |
-| Phase 2: Core Loop | #7–10, #23 | 50 | 3–6 เดือน |
-| Phase 3: Power Users | #11–17 | 99 | 6–9 เดือน |
+| Phase 2: Core Loop | #25, #24, #7–10, #23 | 71 | 3–6 เดือน |
+| Phase 3: Power Users | #11–17, #26 | 107 | 6–9 เดือน |
 | Phase 4: AI Layer | #18–20 | 68 | 9–12 เดือน |
 | Phase 5: Platform | #21–22 | 76 | 12+ เดือน |
-| **รวม** | **23 features** | **369** | **~18 เดือน** |
+| **รวม** | **26 features** | **398** | **~18 เดือน** |
 
 > Velocity แนะนำ: 2-week sprint, 20–25 SP/sprint
 
 ---
 
 ## 💰 Monetization — Free vs Premium
+
+> 📈 **Market validation:** ป้านวล (Pro / Pro Max) + เหมียวจด (subscription) พิสูจน์แล้วว่า **คนไทยยอมจ่าย subscription ให้ finance tool** — เราไม่ต้องพิสูจน์ demand ใหม่
+> 🎯 **หลักการ gate ของ Cardly:** gate ที่ **"advisory moat" ไม่ใช่ "bookkeeping"** — ตรงข้ามคู่แข่งที่ gate เรื่องจด/รายงาน/OCR เพราะสิ่งที่คู่แข่งลอกเราไม่ได้คือ **"การคิดแทน"**
 
 ### Model
 - **รายเดือน + รายปี** (ไม่มี one-time)
@@ -254,6 +284,7 @@
 | Promo Database | ✅ เต็ม | ✅ เต็ม |
 | Merchant Search | ✅ | ✅ |
 | Best Card Rec (Rule-based) | ✅ อันดับ 1 | full ranking + เหตุผล |
+| **Chat Quick Advisor (#24)** | ✅ พื้นฐาน | full ranking + เหตุผลในแชท |
 | **Threshold Tracker** | ❌ | ✅ |
 | Personalized Rec (ML/AI) | ❌ | ✅ |
 | Spending Analytics | รายเดือนรวม | breakdown + history + export |
@@ -261,6 +292,7 @@
 | Merchant Review | ✅ | ✅ |
 | Card Profile & Benefits | ✅ | ✅ |
 | Promo Expiration Alert | basic | advanced + threshold alert |
+| **Recurring Bill → Best Card (#26)** | ❌ | ✅ |
 | Split Bill Optimizer | ❌ | ✅ |
 | Promo Stacking Simulator | ❌ | ✅ |
 | Miles & Points Aggregator | ❌ | ✅ |
@@ -277,6 +309,21 @@
 1. **Card limit 3 ใบ** — Hardcore Gamer ชนทันที ไม่ต้องโน้มน้าว
 2. **Threshold Tracker** — free user เห็นว่าตัวเองพลาด cashback เพราะไม่รู้ยอด → FOMO สูง
 3. **Split Bill + Stacking Simulator** — จ่ายเพื่อ save เงินจริง ROI ชัดเจน
+
+### ⚠️ ข้อตัดสินใจค้าง: 2-tier หรือ 3-tier?
+
+ตาราง gating ด้านบนเป็น **2-tier (Free / Premium)** — แต่คู่แข่งที่ validate ตลาดแล้ว (ป้านวล) ใช้ **3-tier** ซึ่งเปิดช่องเก็บเงินกลุ่ม power user ได้สูงกว่า
+
+| | 2-tier (ปัจจุบัน) | 3-tier (ทางเลือก) |
+|---|---|---|
+| โครงสร้าง | Free / Premium | Free / **Pro** / **Pro Max** |
+| Pro จะได้ | — | บัตรไม่จำกัด · #8 Personalized · #7/#12 tracker · analytics + export |
+| Pro Max จะได้ | — | #15 Stacking · #13 Split Bill · #18/#20 AI · multi-wallet/family |
+| ข้อดี | เข้าใจง่าย ตัดสินใจเร็ว ลด decision fatigue | เก็บ ARPU จาก Hardcore/Travel Hacker ได้สูงกว่า |
+| ข้อเสีย | ทิ้งเงินบนโต๊ะจากกลุ่มที่ยอมจ่ายแพง | ซับซ้อน อธิบายยาก เสี่ยง user เลือกไม่ถูก |
+
+> 📌 **ยังไม่ล็อก** — รอ (ก) validate ราคาป้านวลจริง (ปัจจุบันเว็บบล็อก bot ดึง pricing ไม่ได้) และ (ข) สำรวจ willingness-to-pay จาก beta cohort ก่อนตัดสิน
+> **ตัวเลขราคา** ทุก tier ยังไม่กำหนดเช่นกัน
 
 ### Nickname เมื่อ Subscription หมด
 - ข้อมูล nickname ไม่ถูกลบ
@@ -307,6 +354,188 @@ KBank Sig — cashback ซูเปอร์
 1. **Dependency First** — Infrastructure ก่อน feature เสมอ แม้ user มองไม่เห็น
 2. **Core Loop Before Power Features** — Casual user ต้องใช้ได้ก่อน แล้วค่อย serve power user
 3. **Data Begets AI** — ทำ AI ตอน Phase 1 = waste SP เพราะ data ยังน้อย
+
+---
+
+## 🥊 Competitive Analysis — เหมียวจด vs ป้านวล vs Cardly
+
+> อัปเดต: 24 กรกฎาคม 2026 — วิเคราะห์คู่แข่ง 2 เจ้าในตลาด personal finance ไทย
+
+### คู่แข่งคือใคร
+
+| | **เหมียวจด (MeowJot)** | **ป้านวล (Parnuan)** | **Cardly (เรา)** |
+|---|---|---|---|
+| **เจ้าของ** | KBTG (กสิกร) | Startup อิสระ | — |
+| **แพลตฟอร์ม** | Native app (iOS/Android) | LINE chatbot (ไม่ต้องโหลดแอป) | LINE LIFF (ไม่ต้องโหลดแอป) |
+| **Core job** | จดรายจ่าย **อัตโนมัติจากสลิป/บิล** | จดรายจ่าย **ด้วยการพิมพ์ในแชท** | **แนะนำบัตรที่คุ้มสุดก่อนรูด** |
+| **ทิศเวลา** | 🔙 Backward — "จ่ายอะไรไปแล้ว" | 🔙 Backward — "จ่ายอะไรไปแล้ว" | 🔜 Forward — "ควรจ่ายด้วยบัตรไหน" |
+| **Input** | อัปโหลด/แชร์สลิป (16 แอปธนาคาร), PDF บิลบัตร (7 ผู้ให้บริการ) | พิมพ์ข้อความ เช่น "กาแฟ 50" | เลือกร้าน/หมวด → ระบบคิด net reward |
+| **บัตรเครดิต** | เก็บ**ยอด/ค่างวด/ดอกเบี้ย** จากบิล (bookkeeping) | ไม่มี | **catalog + สิทธิ์ + คำนวณคุ้มสุด** (advisory) |
+| **โปรโมชัน** | ❌ ไม่มี | ❌ ไม่มี | ✅ Core (Promo DB, alert, stacking) |
+| **Business model** | Freemium + Subscription | ฟรี | TBD |
+| **Scale** | KBTG backing, distribution แข็ง | ผู้ใช้ 300k+, 10M+ รายการ | Pre-launch |
+
+### 🎯 Positioning — Cardly อยู่ตรงไหน
+
+สองแกนที่แยกตลาด:
+
+```
+                  ADVISORY (คิดแทน / ตัดสินใจ)
+                          ▲
+                          │
+                    ● Cardly
+                          │
+   MANUAL ────────────────┼──────────────── AUTOMATED
+   (พิมพ์เอง)              │              (อ่านสลิป/บิลเอง)
+                          │
+        ● ป้านวล          │          ● เหมียวจด
+                          │
+                          ▼
+                  BOOKKEEPING (บันทึกย้อนหลัง)
+```
+
+- คู่แข่งทั้งคู่แข่งกันในควอดรันต์ **Bookkeeping** (จดว่าจ่ายอะไรไปแล้ว) — ต่างกันแค่ manual (ป้านวล) vs automated (เหมียวจด)
+- **Cardly เล่นคนละเกม:** ควอดรันต์ **Advisory** — ช่วย "ตัดสินใจก่อนจ่าย" ไม่ใช่ "บันทึกหลังจ่าย" ตรงกับ Vision "Google Maps สำหรับการใช้บัตร" (line 10)
+
+### 🕳️ ช่องว่างตลาด (White Space) ที่ Cardly ยึดได้
+
+1. **ไม่มีใครทำ "บัตรไหนคุ้มสุด"** — ทั้ง 2 เจ้าเป็น expense tracker ล้วน ไม่มี net-reward optimization → นี่คือ Core value ของ Cardly (Feature #5, #8, #13, #15) และเป็น moat ที่ลอกยาก
+2. **ไม่มีใครทำ Promo intelligence** — ทั้ง 2 เจ้าไม่แตะโปรโมชันเลย → ตรงกับ pain point ของ community "ล่าโปรบัตรเครดิต" ที่เป็นต้นทางของโปรเจกต์ (line 3)
+3. **ป้านวลพิสูจน์แล้วว่า LINE-native ตลาดรับ** (300k+ users ไม่ต้องโหลดแอป) → validate การเดิมพันเลือก LIFF ของเรา ลด adoption friction เทียบเหมียวจดที่ต้องโหลด app
+4. **Health/Medical + Travel/Miles ยังว่าง** — ไม่มีเจ้าไหน serve segment 3 (Travel Hacker) หรือ 6 (Health Payer) → Cardly Feature #12, #14, #16 ยึดพื้นที่นี้ได้
+
+### ⚠️ ภัยคุกคาม (ต้องระวัง)
+
+- **เหมียวจดมี KBTG หนุนหลัง** — distribution + ความน่าเชื่อถือด้านการเงินสูงกว่ามาก ถ้าเขา "ขยับขึ้น Advisory" (เพิ่มแนะนำบัตร) จะกินตลาดเราตรงๆ → เราต้องวิ่งให้ถึง Advisory moat ก่อน และลึกกว่า (stacking, community-verified)
+- **ป้านวลมี habit loop ที่แข็ง** — user จดทุกวันผ่านแชท → ถ้าเราอยากได้ transaction data (จำเป็นสำหรับ #7, #8, #10) ต้องสร้าง input ที่ "ง่ายเท่าพิมพ์ในแชท" ไม่งั้นแพ้เรื่อง data capture
+
+---
+
+## 💡 Feature Inspiration จากคู่แข่ง → แมปเข้า Roadmap
+
+> หลักการ: **ลอก mechanic ที่ดี แต่เอามารับใช้ Advisory job ของเรา** ไม่ใช่กลายเป็น expense tracker อีกตัว
+
+| # | แรงบันดาลใจจาก | Mechanic | แมปเข้า Feature | Phase | หมายเหตุ / ปรับใช้ |
+|---|---|---|---|:--:|---|
+| A | 🐱 เหมียวจด | อ่านสลิปโอน → transaction อัตโนมัติ | **#21 Statement OCR** (มีอยู่แล้ว) | **P4** | ตรงกับที่วางไว้ — แต่ใช้เพื่อ feed #7/#10 (data สำหรับ threshold + analytics) ไม่ใช่แค่ bookkeeping |
+| B | 🐱 เหมียวจด | อัปโหลด PDF บิลบัตร → ดึงยอด/ค่างวด | **#7 Benefit & Threshold Tracker** (มีอยู่แล้ว) | **P1** | บิลบัตรคือ input ที่แม่นสุดสำหรับ "ใช้ไปเท่าไหร่ เทียบ threshold" — พิจารณาดึง PDF-import เข้ามาเสริม #7 ให้ auto |
+| C | 🐱 เหมียวจด | ถ่าย/อัปโหลดรูป → parse ข้อมูล | **#19 Screenshot Promo Analyzer** (มีอยู่แล้ว) | **P3** | เหมียวจด parse สลิป, เรา parse **รูปโปร** → เป็น input engine ของ Promo DB |
+| D | 💬 ป้านวล | พิมพ์ในแชท LINE → บันทึกทันที (zero-friction) | **#24 Chat-based Quick Advisor** ✅ รับเข้าแล้ว | **P1** | ⏭️ Priority ถัดไป — advisory ผ่านแชท (ไม่ใช่แค่ log) เก็บ intent เป็น channel ③ (ดูรายละเอียดด้านล่าง) |
+| E | 💬 ป้านวล | ตั้งงบต่อหมวด + เตือน real-time | **#10 Cashback & Spending Analytics** (มีอยู่แล้ว) | **P2** | เสริมมุม "งบ/เตือน" เข้า analytics ที่วางไว้ |
+| F | 🐱 เหมียวจด | Freemium + Subscription | **Business model** (ยังไม่ระบุใน backlog) | — | ยืนยันว่าตลาดยอมจ่าย subscription สำหรับ finance tool → เก็บไว้พิจารณา monetization |
+
+### 💬 Feature #24 — Chat-based Quick Advisor ✅ รับเข้า Backlog แล้ว (⏭️ NEXT UP)
+
+**Feature #24: Chat-based Quick Advisor** — *P1 (Phase 2), 8 SP*
+> "ก่อนจ่ายพิมพ์ถามป้า(บัตร)ได้เลย" — user พิมพ์ในแชท LINE เช่น *"Starbucks 200"* หรือ *"จะรูดโลตัส"* → ระบบตอบ **บัตรที่ควรรูด + เหตุผล (net reward)** ทันที
+
+- **Dependency:** ต้องมี #5 (Best Card Recommendation) + #3 (MCC Mapping) เป็น logic แกนก่อน — chat เป็น input layer ใหม่ที่ครอบ logic เดิม (ไม่ได้เขียน logic แนะนำใหม่)
+- **ทำไมสำคัญ:** ชนป้านวลตรงจุดแข็งที่สุด (zero-friction chat) แต่ให้ **คำแนะนำ (advisory)** แทนการจด (bookkeeping) → differentiator ชัด + เก็บ intent data (Job B / channel ③) มาปรับ #8
+- **ได้เปรียบเชิงเทคนิค:** อยู่บน LINE ecosystem อยู่แล้ว — LINE Messaging API + rich menu → deep link เข้า LIFF ได้ทันที ไม่ต้องสร้างช่องทางใหม่
+- **สถานะ:** ✅ PO รับเข้า backlog แล้ว จัดเป็น **priority ถัดไป** — เป็น first pickup ของ Phase 2 หลัง P0 foundation (#3, #5) พร้อม
+
+### 📌 สรุปเชิงกลยุทธ์ (Takeaways)
+
+1. **อย่าไล่ตามเป็น expense tracker** — สนามนั้นมีเจ้าตลาดหนุนหลังธนาคารแล้ว เราชนะด้วย **Advisory ("คิดแทน")** ไม่ใช่ **Bookkeeping ("จดให้")**
+2. **เร่ง Advisory moat ให้ลึก** — #5 → #13/#15 (stacking) คือสิ่งที่คู่แข่งลอกยากสุด ทำก่อนเหมียวจดขยับ
+3. **ยืม zero-friction chat ของป้านวล มาเป็น input ให้ Advisory** (Feature #24) — ได้ทั้ง adoption และ data
+4. **OCR/สลิป (เหมียวจดถนัด) จัดไว้ท้าย roadmap ถูกแล้ว** — เป็น convenience layer ไม่ใช่ core value เรา ไม่ต้องรีบชน
+
+---
+
+## 🔌 Transaction Capture & Reconciliation Strategy
+
+> สรุปการตัดสินใจ (24 ก.ค. 2026): Cardly ได้ข้อมูลรายจ่ายบัตรเครดิตเข้าระบบยังไง และจัดการยังไงเมื่อข้อมูลจากหลายแหล่งชนกัน
+> **บริบทสำคัญ:** การรูดบัตรเครดิต **ไม่เหลือ gallery slip** ให้อ่านแบบเหมียวจด (ต่างจากการโอน PromptPay) และ Cardly เป็น **LIFF (web)** จึงอ่าน push notification / SMS / email ของแอปอื่นไม่ได้ → ต้องออกแบบ capture เอง
+
+### 1. สอง data jobs (คนละความต้องการ ห้ามยำรวมกัน)
+
+| | **Job A — ครบ + แม่น** | **Job B — ทันเวลา** |
+|---|---|---|
+| Feature | สะสมไมล์ (#12), waive ค่าธรรมเนียมรายปี, ยอดที่ต้องจ่ายจริง | แนะนำบัตรตอนจะรูด (#5/#24), "อีก X ถึงครบโปร" (#7) |
+| Horizon | ทั้งปี / ทั้งรอบบิล | ณ วินาทีที่จะจ่าย |
+| ต้องการ | ครบถ้วน + แม่นยำ (ช้าได้) | เรียลไทม์ (ยอดคลาดนิดหน่อยรับได้) |
+| Primary source | **Statement (บิลรายเดือน)** | **intent-capture ณ จังหวะ advisory + manual** |
+
+> หลัก: **ไม่มี channel เดียวที่ทั้งครบและทันเวลา** → กำหนด primary channel **ต่อ job** ไม่ใช่หา pipeline เดียวรวบทุก feature
+
+### 2. ช่องทาง capture (5 ทาง) + รับใช้ job ไหน
+
+| ช่องทาง | รับใช้ | หมายเหตุ |
+|---|:--:|---|
+| ① กรอกผ่าน chat (LINE) | B | zero-friction แบบป้านวล |
+| ② เมนู form ใน LIFF | B | กรอกแบบมีโครงสร้าง |
+| ③ search ร้าน → แนะนำบัตร → กรอกเลย | B | 💎 **ตัวเด็ด** — capture ณ จังหวะ advisory ไม่มี friction เพิ่ม |
+| ④ อ่าน Statement รายเดือน | A | 🏆 authoritative source ของ Job A (granularity รายเดือน = พอสำหรับเป้าทั้งปี) |
+| ⑤ ถ่ายรูปสลิป/ใบเสร็จกระดาษ | A | friction สูง เสริมระหว่างรอ statement |
+
+> ❌ ตัดทิ้งสำหรับ LIFF: อ่าน push / SMS / email receipt ของแอปอื่น — web ทำไม่ได้ (ต้อง native + OS permission)
+
+### 3. Dedup = "Single Evolving Row"
+
+ปัญหา: user กรอก manual บางรายการ (เช่น 2–3) แล้ว upload statement (20) → เกิดรายการซ้ำ
+วิธีแก้: **ไม่สร้าง 2 แถวแล้วค่อยลบซ้ำ — ให้ manual entry "เลื่อนสถานะ" กลายเป็น statement เลย** → โครงสร้าง double-count ไม่ได้เพราะมีแค่แถวเดียว
+
+- manual entry เกิดเป็น `status = estimated`
+- ตอน import statement: วนเทียบ **เฉพาะ** รายการ `estimated` (ไม่กี่รายการ) กับ statement line ด้วย key → **บัตรเดียวกัน + ยอดตรง + txn date ห่าง ≤3 วัน** (tie-break: merchant fuzzy)
+  - **match** → เลื่อนแถวเป็น `confirmed`, ทับ amount/date ด้วยยอดจริงจาก bank, **เก็บ enrichment เดิม** (merchant / category / โปรที่ตั้งใจใช้)
+  - **ไม่ match** → insert แถวใหม่ `confirmed` (รายการที่เหลือ) แล้ว auto-enrich ผ่าน MCC
+- upload statement เดิมซ้ำ → กันด้วย `dedup_hash` (card + posting_date + amount + descriptor) unique → ข้ามรายการที่มีอยู่แล้ว
+
+### 4. Statement ชนะเสมอ + supersede (ขีดฆ่า ไม่ลบ)
+
+เมื่อ statement import ครบรอบ = **ground truth ของรอบนั้น**
+รายการ manual ที่ไม่ match ใครเลย → ตั้ง `status = superseded` (ไม่ `DELETE`)
+
+- **ทำไมไม่ลบ:** เก็บ audit trail + user กู้คืนได้ถ้า reconcile ผิด + ไม่ทำลาย reference โปร
+- **การนับยอด:** query `WHERE status != 'superseded'` → แถวที่ขีดฆ่าเหมือนไม่มีตัวตนในการคำนวณ แต่ยังอยู่ใน DB
+- **fuzzy amount** (±5% หรือ ±20 บาท) ใช้ **เฉพาะช่วยหา candidate** เท่านั้น — ถ้า ambiguous ค่อยถาม user
+
+### 5. เคส pending ข้ามรอบ (grace window)
+
+รอบบิลตัดตาม **posting date** ไม่ใช่ txn date → รายการรูด 30 ม.ค. อาจ post 2 ก.พ. → ไปโผล่ statement เดือน **ก.พ.** → กฎดิบ "statement ม.ค. ครบ → manual ที่ไม่ match = supersede" จะ **ขีดฆ่ารายการที่ถูกต้องทิ้ง**
+
+แก้ 3 ชั้น:
+1. **match ด้วย txn date ข้ามรอบได้** — statement ไทยแสดง txn date ด้วย → statement ก.พ. จะ claim manual entry 30 ม.ค. เอง (อย่าล็อค matching ไว้ในรอบเดียว)
+2. **settlement grace window** — รายการที่ txn date อยู่โซนขอบรอบ (≈5 วันก่อนตัด + 3 วันหลัง) → mark `pending_carryover`, **ห้าม supersede**, ยกไปรอ match กับ statement รอบถัดไป
+3. **supersede จริงต่อเมื่อ** — (ก) อยู่ลึกในรอบที่ import ครบ + ไม่ match (= mis-entry/refund จริง) หรือ (ข) ขอบรอบแต่รอครบอีก 1 รอบถัดไปแล้วยังไม่ match
+
+> user ไม่เคยอัป statement รอบถัดไปเลย → รายการค้างเป็น `estimated` ตลอด = ยอมรับได้ (เป็นแค่ยอดประมาณการ ไม่ทำใครพัง)
+
+### 6. Scoping — schema ปัจจุบัน vs ที่กลไกเต็มรูปแบบต้องใช้
+
+**สถานะจริงตอนนี้ (อยู่ใน DB แล้ว):**
+```
+transactions: users_card_id, merchant_id, amount, spent_at, note,
+              is_reconciled, reconciled_at, external_ref
+```
+พอสำหรับเฟสนี้ — บันทึกรายการจาก chat/LIFF และ mark ว่ากระทบยอดกับ statement แล้วหรือยัง
+
+**สิ่งที่ต้องเพิ่มตอนทำ engine (P4 คู่กับ #21):**
+
+| ต้องการ | field ที่ยังไม่มี | ทำไมจำเป็น |
+|---|---|---|
+| แยกช่องทางที่ข้อมูลเข้ามา (channel ①–⑤) | `source` | รู้ว่ารายการมาจาก chat / form / statement / recurring — ใช้แยก Job A vs Job B |
+| **supersede** (ขีดฆ่า ไม่ลบ) | `status` 3 สถานะ | `is_reconciled` เป็น boolean → บอกได้แค่ "กระทบยอดแล้ว/ยัง" แต่บอก "ยกเลิกเพราะ statement ไม่มีรายการนี้" ไม่ได้ |
+| เก็บยอดเดิมที่ user กรอก | `estimated_amount` | ตอน statement ทับ `amount` ยอดที่ user กรอกจะหาย |
+| กัน import statement ซ้ำ | `dedup_hash` (unique) | `external_ref` ไม่ unique จึงกันซ้ำระดับ DB ไม่ได้ |
+| grace window (pending ข้ามรอบ) | `posted_at`, `pending_carryover` | ต้องแยก posting date จาก txn date และ mark รายการขอบรอบไม่ให้ถูก supersede |
+
+> 📌 **การตัดสินใจ (29 ก.ค. 2026):** เลือกลง 3 field แบบเรียบก่อน (`is_reconciled` / `reconciled_at` / `external_ref`) แทนที่จะใส่ field ครบชุดตั้งแต่แรก
+> **ผลที่ตามมา:** กลไก supersede + grace window ที่ออกแบบไว้ในหัวข้อ 3–5 **ยังใช้งานไม่ได้จนกว่าจะเพิ่ม field ข้างบน** — ต้อง migrate เพิ่มอีกรอบตอนทำ #21 (ยอมรับ trade-off นี้แล้ว เพราะตอนนั้น table ยังข้อมูลไม่เยอะ)
+
+> ✅ **codebase ยืนยัน:** `users_card` มี `billing_cycle_day` / `payment_due_day` / `last_four` พร้อมใช้กำหนดขอบรอบบิลแล้ว
+
+---
+
+## 🔮 Parking Lot (พิจารณาภายหลัง — ยังไม่ commit SP)
+
+Candidate จาก competitive analysis ที่ยังไม่รับเข้า backlog:
+
+- 📄 **แยก #21** — Manual Statement Upload (ก่อน, Job A) ↔ OCR อัตโนมัติ (ท้าย) → ดึง manual upload ขึ้น P2 ได้ถ้าไมล์/ค่าธรรมเนียมรายปีเป็น priority
+- 📤 **Export CSV/Excel** — enhancement ของ #10 (อยู่ในตาราง gating เป็น Premium แล้ว แต่ยังไม่มี SP ใน backlog)
+- 👛 **Multi-wallet / Family advisory** — segment ใหม่ (คู่รัก/ครอบครัวที่แชร์บัตร) เป็น big bet ไว้ phase หลัง
+- 🔴 **Savings Goals** — **ข้าม**: เป็น bookkeeping/PFM ล้วน หลุด core advisory ของเรา
 
 ---
 
