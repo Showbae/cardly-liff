@@ -159,14 +159,14 @@
 > ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
 
 **25. Transaction Ledger (infra)** *(⏫ ต้องมาก่อน #24)*
-- ✅ มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร พร้อม field รองรับ reconcile: `status` (estimated\|confirmed\|superseded), `source`, `posted_at`, `estimated_amount`, `dedup_hash`, `statement_batch_id`, `pending_carryover`
-- ✅ มี API บันทึก transaction จาก channel ①②③ เป็น `status = estimated` พร้อม tag `source` ถูกต้อง (`POST /api/transactions` → form/search/recurring · LINE webhook → chat)
-- ✅ Read path กรอง `status != 'superseded'` แล้ว
+- ✅ มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร (`users_card_id`, `merchant_id`, `amount`, `spent_at`, `note`)
+- ✅ มี field reconcile เบื้องต้น: `is_reconciled` · `reconciled_at` · `external_ref` (apply เข้า DB จริงแล้ว)
+- ✅ มี write path จาก LIFF (`POST /api/transactions`) และ LINE chat (webhook)
 - ⬜ คำนวณยอดสะสมต่อบัตร/หมวด/รอบบิล เพื่อป้อน #7/#8/#10
 - ⬜ Supabase RLS: user เห็นเฉพาะ transaction ของตัวเอง
 
-> ℹ️ engine matching / grace window / supersede logic **ยังไม่ทำในเฟสนี้** — เลื่อนไปคู่กับ #21 (P4) ตาม Transaction Capture Strategy; เฟสนี้แค่วาง schema + write path ให้ครบ
-> ⚠️ **ต้อง apply schema เข้า DB จริง** — `prisma/schema.prisma` มี field ครบแล้ว แต่ยังต้องรัน `npx prisma migrate dev` (หรือ `db push`) + `npx prisma generate`
+> ℹ️ engine matching / grace window / supersede logic **ยังไม่ทำในเฟสนี้** — เลื่อนไปคู่กับ #21 (P4) ตาม Transaction Capture Strategy
+> ⚠️ **schema ปัจจุบันยังไม่รองรับกลไกเต็มรูปแบบ** — ดูหัวข้อ 6 ของ Transaction Capture Strategy ว่าขาดอะไรและต้องเพิ่มตอนไหน
 
 **24. Chat-based Quick Advisor** *(⏭️ NEXT UP)*
 - user พิมพ์ข้อความในแชท LINE (เช่น "Starbucks 200" หรือ "จะรูดโลตัส") แล้วระบบตอบบัตรที่ควรรูด + เหตุผล (net reward) ได้ถูกต้อง โดยเรียกใช้ logic เดียวกับ #5 (ไม่เขียน logic แนะนำใหม่)
@@ -502,14 +502,29 @@ KBank Sig — cashback ซูเปอร์
 
 > user ไม่เคยอัป statement รอบถัดไปเลย → รายการค้างเป็น `estimated` ตลอด = ยอมรับได้ (เป็นแค่ยอดประมาณการ ไม่ทำใครพัง)
 
-### 6. Scoping — ออกแบบ schema ตอนนี้ / สร้าง engine ทีหลัง
+### 6. Scoping — schema ปัจจุบัน vs ที่กลไกเต็มรูปแบบต้องใช้
 
-- **ทำตอนนี้ (ถูก):** ออกแบบตาราง `transactions` ให้พร้อม reconcile ตั้งแต่วันแรก
-  `status` (estimated \| confirmed \| superseded) · `source` (chat \| search \| form \| statement \| receipt) · `estimated_amount` · `dedup_hash` · `statement_batch_id` · `pending_carryover`
-  (เพิ่ม field เหล่านี้ทีหลัง = migration เจ็บ)
-- **เลื่อนไป P4 คู่กับ #21:** engine matching + grace window + supersede logic — ยังไม่จำเป็นจนกว่าจะมี statement import (เฟสแรกมีแต่ manual/chat ล้วน ยังไม่มีอะไรให้ชน)
+**สถานะจริงตอนนี้ (อยู่ใน DB แล้ว):**
+```
+transactions: users_card_id, merchant_id, amount, spent_at, note,
+              is_reconciled, reconciled_at, external_ref
+```
+พอสำหรับเฟสนี้ — บันทึกรายการจาก chat/LIFF และ mark ว่ากระทบยอดกับ statement แล้วหรือยัง
 
-> ✅ **codebase ยืนยัน:** ยังไม่มีตาราง `transactions`; และ `users_card` มี `billing_cycle_day` / `payment_due_day` / `last_four` พร้อมใช้กำหนดขอบรอบบิลแล้ว
+**สิ่งที่ต้องเพิ่มตอนทำ engine (P4 คู่กับ #21):**
+
+| ต้องการ | field ที่ยังไม่มี | ทำไมจำเป็น |
+|---|---|---|
+| แยกช่องทางที่ข้อมูลเข้ามา (channel ①–⑤) | `source` | รู้ว่ารายการมาจาก chat / form / statement / recurring — ใช้แยก Job A vs Job B |
+| **supersede** (ขีดฆ่า ไม่ลบ) | `status` 3 สถานะ | `is_reconciled` เป็น boolean → บอกได้แค่ "กระทบยอดแล้ว/ยัง" แต่บอก "ยกเลิกเพราะ statement ไม่มีรายการนี้" ไม่ได้ |
+| เก็บยอดเดิมที่ user กรอก | `estimated_amount` | ตอน statement ทับ `amount` ยอดที่ user กรอกจะหาย |
+| กัน import statement ซ้ำ | `dedup_hash` (unique) | `external_ref` ไม่ unique จึงกันซ้ำระดับ DB ไม่ได้ |
+| grace window (pending ข้ามรอบ) | `posted_at`, `pending_carryover` | ต้องแยก posting date จาก txn date และ mark รายการขอบรอบไม่ให้ถูก supersede |
+
+> 📌 **การตัดสินใจ (29 ก.ค. 2026):** เลือกลง 3 field แบบเรียบก่อน (`is_reconciled` / `reconciled_at` / `external_ref`) แทนที่จะใส่ field ครบชุดตั้งแต่แรก
+> **ผลที่ตามมา:** กลไก supersede + grace window ที่ออกแบบไว้ในหัวข้อ 3–5 **ยังใช้งานไม่ได้จนกว่าจะเพิ่ม field ข้างบน** — ต้อง migrate เพิ่มอีกรอบตอนทำ #21 (ยอมรับ trade-off นี้แล้ว เพราะตอนนั้น table ยังข้อมูลไม่เยอะ)
+
+> ✅ **codebase ยืนยัน:** `users_card` มี `billing_cycle_day` / `payment_due_day` / `last_four` พร้อมใช้กำหนดขอบรอบบิลแล้ว
 
 ---
 

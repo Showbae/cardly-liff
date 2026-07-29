@@ -172,8 +172,6 @@ async function handlePostback(lineUserId: string, postbackData: string, replyTok
         amount: parseFloat(data.amount),
         note: merchant ? null : data.merchant,
         spent_at: new Date(),
-        source: 'chat',
-        estimated_amount: parseFloat(data.amount),
       },
     })
 
