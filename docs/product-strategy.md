@@ -159,12 +159,14 @@
 > ⚠️ **Schema decision needed:** `card_base_benefit` ปัจจุบันรองรับแค่ rate-based (multiple_rate + condition) — ต้องตัดสินใจว่าจะ (ก) extend table เพิ่ม field `perk_title` / `perk_description` สำหรับ perks เชิงคุณภาพ หรือ (ข) สร้าง table `card_perks` แยกต่างหาก
 
 **25. Transaction Ledger (infra)** *(⏫ ต้องมาก่อน #24)*
-- มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร พร้อม field รองรับ reconcile: `status` (estimated\|confirmed\|superseded), `source`, `estimated_amount`, `dedup_hash`, `statement_batch_id`, `pending_carryover`
-- มี API บันทึก transaction จาก channel ①②③ (chat/form/search) เป็น `status = estimated`
-- คำนวณยอดสะสมต่อบัตร/หมวด/รอบบิลได้ (query `WHERE status != 'superseded'`) เพื่อป้อน #7/#8/#10
-- Supabase RLS: user เห็นเฉพาะ transaction ของตัวเอง
+- ✅ มีตาราง `transactions` เก็บรายการใช้จ่ายต่อ user/บัตร พร้อม field รองรับ reconcile: `status` (estimated\|confirmed\|superseded), `source`, `posted_at`, `estimated_amount`, `dedup_hash`, `statement_batch_id`, `pending_carryover`
+- ✅ มี API บันทึก transaction จาก channel ①②③ เป็น `status = estimated` พร้อม tag `source` ถูกต้อง (`POST /api/transactions` → form/search/recurring · LINE webhook → chat)
+- ✅ Read path กรอง `status != 'superseded'` แล้ว
+- ⬜ คำนวณยอดสะสมต่อบัตร/หมวด/รอบบิล เพื่อป้อน #7/#8/#10
+- ⬜ Supabase RLS: user เห็นเฉพาะ transaction ของตัวเอง
 
 > ℹ️ engine matching / grace window / supersede logic **ยังไม่ทำในเฟสนี้** — เลื่อนไปคู่กับ #21 (P4) ตาม Transaction Capture Strategy; เฟสนี้แค่วาง schema + write path ให้ครบ
+> ⚠️ **ต้อง apply schema เข้า DB จริง** — `prisma/schema.prisma` มี field ครบแล้ว แต่ยังต้องรัน `npx prisma migrate dev` (หรือ `db push`) + `npx prisma generate`
 
 **24. Chat-based Quick Advisor** *(⏭️ NEXT UP)*
 - user พิมพ์ข้อความในแชท LINE (เช่น "Starbucks 200" หรือ "จะรูดโลตัส") แล้วระบบตอบบัตรที่ควรรูด + เหตุผล (net reward) ได้ถูกต้อง โดยเรียกใช้ logic เดียวกับ #5 (ไม่เขียน logic แนะนำใหม่)
@@ -265,6 +267,9 @@
 
 ## 💰 Monetization — Free vs Premium
 
+> 📈 **Market validation:** ป้านวล (Pro / Pro Max) + เหมียวจด (subscription) พิสูจน์แล้วว่า **คนไทยยอมจ่าย subscription ให้ finance tool** — เราไม่ต้องพิสูจน์ demand ใหม่
+> 🎯 **หลักการ gate ของ Cardly:** gate ที่ **"advisory moat" ไม่ใช่ "bookkeeping"** — ตรงข้ามคู่แข่งที่ gate เรื่องจด/รายงาน/OCR เพราะสิ่งที่คู่แข่งลอกเราไม่ได้คือ **"การคิดแทน"**
+
 ### Model
 - **รายเดือน + รายปี** (ไม่มี one-time)
 - **Launch timing**: หลัง Phase 3+ เมื่อ AI feature พร้อม (value prop แข็งพอ)
@@ -279,6 +284,7 @@
 | Promo Database | ✅ เต็ม | ✅ เต็ม |
 | Merchant Search | ✅ | ✅ |
 | Best Card Rec (Rule-based) | ✅ อันดับ 1 | full ranking + เหตุผล |
+| **Chat Quick Advisor (#24)** | ✅ พื้นฐาน | full ranking + เหตุผลในแชท |
 | **Threshold Tracker** | ❌ | ✅ |
 | Personalized Rec (ML/AI) | ❌ | ✅ |
 | Spending Analytics | รายเดือนรวม | breakdown + history + export |
@@ -286,6 +292,7 @@
 | Merchant Review | ✅ | ✅ |
 | Card Profile & Benefits | ✅ | ✅ |
 | Promo Expiration Alert | basic | advanced + threshold alert |
+| **Recurring Bill → Best Card (#26)** | ❌ | ✅ |
 | Split Bill Optimizer | ❌ | ✅ |
 | Promo Stacking Simulator | ❌ | ✅ |
 | Miles & Points Aggregator | ❌ | ✅ |
@@ -302,6 +309,21 @@
 1. **Card limit 3 ใบ** — Hardcore Gamer ชนทันที ไม่ต้องโน้มน้าว
 2. **Threshold Tracker** — free user เห็นว่าตัวเองพลาด cashback เพราะไม่รู้ยอด → FOMO สูง
 3. **Split Bill + Stacking Simulator** — จ่ายเพื่อ save เงินจริง ROI ชัดเจน
+
+### ⚠️ ข้อตัดสินใจค้าง: 2-tier หรือ 3-tier?
+
+ตาราง gating ด้านบนเป็น **2-tier (Free / Premium)** — แต่คู่แข่งที่ validate ตลาดแล้ว (ป้านวล) ใช้ **3-tier** ซึ่งเปิดช่องเก็บเงินกลุ่ม power user ได้สูงกว่า
+
+| | 2-tier (ปัจจุบัน) | 3-tier (ทางเลือก) |
+|---|---|---|
+| โครงสร้าง | Free / Premium | Free / **Pro** / **Pro Max** |
+| Pro จะได้ | — | บัตรไม่จำกัด · #8 Personalized · #7/#12 tracker · analytics + export |
+| Pro Max จะได้ | — | #15 Stacking · #13 Split Bill · #18/#20 AI · multi-wallet/family |
+| ข้อดี | เข้าใจง่าย ตัดสินใจเร็ว ลด decision fatigue | เก็บ ARPU จาก Hardcore/Travel Hacker ได้สูงกว่า |
+| ข้อเสีย | ทิ้งเงินบนโต๊ะจากกลุ่มที่ยอมจ่ายแพง | ซับซ้อน อธิบายยาก เสี่ยง user เลือกไม่ถูก |
+
+> 📌 **ยังไม่ล็อก** — รอ (ก) validate ราคาป้านวลจริง (ปัจจุบันเว็บบล็อก bot ดึง pricing ไม่ได้) และ (ข) สำรวจ willingness-to-pay จาก beta cohort ก่อนตัดสิน
+> **ตัวเลขราคา** ทุก tier ยังไม่กำหนดเช่นกัน
 
 ### Nickname เมื่อ Subscription หมด
 - ข้อมูล nickname ไม่ถูกลบ
@@ -491,27 +513,12 @@ KBank Sig — cashback ซูเปอร์
 
 ---
 
-## 💳 Monetization / Pricing Strategy
-
-> Validate จากตลาด: ป้านวล (Pro / Pro Max) + เหมียวจด (subscription) พิสูจน์แล้วว่า **คนไทยยอมจ่าย subscription ให้ finance tool**
-> หลักการ Cardly: **gate ที่ "advisory moat" ไม่ใช่ "bookkeeping"** — ตรงข้ามคู่แข่งที่ gate เรื่องจด/รายงาน/OCR เพราะสิ่งที่คู่แข่งลอกเราไม่ได้คือ "การคิดแทน"
-
-| Tier | ปลดล็อก (draft) |
-|---|---|
-| **Free** | บัตร ≤ 3 ใบ · แนะนำบัตรพื้นฐาน (#5) · promo alert (#6) · chat advisor พื้นฐาน (#24) |
-| **Pro** | บัตรไม่จำกัด · Personalized Recommendation (#8) · Threshold/Miles tracker เต็ม (#7/#12) · analytics เชิงลึก + export (#10) |
-| **Pro Max** | 🧮 Promo Stacking Simulator (#15) · Split Bill Optimizer (#13) · AI Ask (#18) / AI Feed (#20) · multi-wallet / family |
-
-> ⚠️ ตัวเลขราคา + รายละเอียด tier **ยังไม่ล็อก** — รอ validate ราคาป้านวลจริง (ดึงหน้า pricing ไม่ได้ ปัจจุบันเว็บบล็อก bot) + สำรวจ willingness-to-pay ก่อนกำหนดจริง
-
----
-
 ## 🔮 Parking Lot (พิจารณาภายหลัง — ยังไม่ commit SP)
 
 Candidate จาก competitive analysis ที่ยังไม่รับเข้า backlog:
 
 - 📄 **แยก #21** — Manual Statement Upload (ก่อน, Job A) ↔ OCR อัตโนมัติ (ท้าย) → ดึง manual upload ขึ้น P2 ได้ถ้าไมล์/ค่าธรรมเนียมรายปีเป็น priority
-- 📤 **Export CSV/Excel** — enhancement ของ #10 (power user ชอบ)
+- 📤 **Export CSV/Excel** — enhancement ของ #10 (อยู่ในตาราง gating เป็น Premium แล้ว แต่ยังไม่มี SP ใน backlog)
 - 👛 **Multi-wallet / Family advisory** — segment ใหม่ (คู่รัก/ครอบครัวที่แชร์บัตร) เป็น big bet ไว้ phase หลัง
 - 🔴 **Savings Goals** — **ข้าม**: เป็น bookkeeping/PFM ล้วน หลุด core advisory ของเรา
 

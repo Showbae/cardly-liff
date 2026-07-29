@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
   }
   try {
     const txs = await prisma.transactions.findMany({
-      where: { users_card_id: usersCardId },
+      // superseded = รายการที่ถูก statement ทับแล้ว ไม่นับในยอด (ดู Transaction Capture Strategy)
+      where: { users_card_id: usersCardId, status: { not: 'superseded' } },
       orderBy: { spent_at: 'desc' },
       select: {
         id:       true,
@@ -41,6 +42,8 @@ const createSchema = z.object({
   amount:      z.number().positive().max(999_999.99),
   spentAt:     z.string().datetime().optional(),
   note:        z.string().max(255).optional(),
+  // capture channel — ดู docs/product-strategy.md → Transaction Capture Strategy
+  source:      z.enum(['form', 'search', 'recurring']).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -55,6 +58,8 @@ export async function POST(req: NextRequest) {
         amount:        data.amount,
         spent_at:      data.spentAt ? new Date(data.spentAt) : new Date(),
         note:          data.note ?? null,
+        source:           data.source ?? 'form',
+        estimated_amount: data.amount,
       },
       select: {
         id:           true,
