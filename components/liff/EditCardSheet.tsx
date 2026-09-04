@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { updateCard, type UserCard } from '@/lib/cards'
 
 const BANK_GRADIENT: Record<string, string> = {
@@ -58,6 +58,33 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Lock the page behind so only the sheet scrolls until it is dismissed.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  // Drag the handle down to dismiss.
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragStartY = useRef<number | null>(null)
+
+  const onDragStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY
+    setDragging(true)
+  }
+  const onDragMove = (e: React.TouchEvent) => {
+    if (dragStartY.current === null) return
+    setDragY(Math.max(0, e.touches[0].clientY - dragStartY.current))
+  }
+  const onDragEnd = () => {
+    setDragging(false)
+    dragStartY.current = null
+    if (dragY > 90) onClose()
+    else setDragY(0)
+  }
+
   const handleSave = async () => {
     const rawLimit = creditLimit.replace(/,/g, '')
     const limitNum = rawLimit ? Number(rawLimit) : null
@@ -98,31 +125,38 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — above the bottom tab bar (z-50), locks the page behind */}
       <div
-        onClick={onClose}
+        onClick={saving ? undefined : onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 40,
+          position: 'fixed', inset: 0, zIndex: 60,
           background: 'rgba(0,0,0,.4)',
           backdropFilter: 'blur(2px)',
           WebkitBackdropFilter: 'blur(2px)',
+          touchAction: 'none',
         }}
       />
 
       {/* Sheet */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 61,
         background: 'var(--surface)',
         borderRadius: '24px 24px 0 0',
         padding: '12px 22px 40px',
         boxShadow: '0 -2px 40px rgba(0,0,0,.15)',
+        maxHeight: '90vh', overflowY: 'auto',
+        transform: `translateY(${dragY}px)`,
+        transition: dragging ? 'none' : 'transform .25s ease',
       }}>
-        {/* Handle */}
-        <div style={{
-          width: 36, height: 4, borderRadius: 2,
-          background: 'var(--line)',
-          margin: '0 auto 20px',
-        }} />
+        {/* Drag handle — pull down to dismiss */}
+        <div
+          onTouchStart={onDragStart}
+          onTouchMove={onDragMove}
+          onTouchEnd={onDragEnd}
+          style={{ padding: '4px 0 16px', margin: '-4px 0 0', cursor: 'grab', touchAction: 'none' }}
+        >
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)', margin: '0 auto' }} />
+        </div>
 
         {/* Card identity */}
         <div style={{
@@ -175,7 +209,7 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
               onChange={e => setLastFour(e.target.value.replace(/\D/g, ''))}
               style={{
                 flex: 1, padding: '13px 14px',
-                fontSize: 15, color: 'var(--ink)', background: 'transparent',
+                fontSize: 16, color: 'var(--ink)', background: 'transparent',
                 border: 'none', outline: 'none',
                 fontFamily: 'ui-monospace, "SF Mono", monospace',
                 letterSpacing: 2,
@@ -201,7 +235,7 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
               onChange={e => handleLimitInput(e.target.value)}
               style={{
                 flex: 1, padding: '13px 14px',
-                fontSize: 15, color: 'var(--ink)', background: 'transparent',
+                fontSize: 16, color: 'var(--ink)', background: 'transparent',
                 border: 'none', outline: 'none', fontFamily: 'inherit',
               }}
             />
@@ -288,7 +322,7 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
                 autoFocus
                 style={{
                   flex: 1, padding: '13px 14px',
-                  fontSize: 15, color: 'var(--ink)', background: 'transparent',
+                  fontSize: 16, color: 'var(--ink)', background: 'transparent',
                   border: 'none', outline: 'none', fontFamily: 'inherit',
                 }}
               />
@@ -379,7 +413,7 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
                 autoFocus
                 style={{
                   flex: 1, padding: '13px 14px',
-                  fontSize: 15, color: 'var(--ink)', background: 'transparent',
+                  fontSize: 16, color: 'var(--ink)', background: 'transparent',
                   border: 'none', outline: 'none', fontFamily: 'inherit',
                 }}
               />
@@ -421,18 +455,6 @@ export function EditCardSheet({ card, onClose, onSaved }: Props) {
             }} />
           )}
           {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-        </button>
-        <button
-          onClick={onClose}
-          disabled={saving}
-          style={{
-            width: '100%', padding: 10, marginTop: 10,
-            borderRadius: 999, background: 'transparent', border: 'none',
-            fontSize: 14, fontWeight: 500, color: 'var(--ink-3)',
-            fontFamily: 'inherit', cursor: 'pointer',
-          }}
-        >
-          ยกเลิก
         </button>
       </div>
     </>

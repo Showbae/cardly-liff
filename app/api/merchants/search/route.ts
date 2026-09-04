@@ -16,6 +16,11 @@ let cachedMerchants: MerchantRecord[] | null = null
 let cachedAt = 0
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
+// `threshold` only caps matching within a single key; the combined weighted score
+// across name_eng/name_th can still exceed it (e.g. "KBank" → Bangchak at 0.58).
+// Real merchant hits score ≤0.3, noise starts at ~0.58 — 0.5 leaves room for typos.
+const SCORE_CUTOFF = 0.5
+
 async function getMerchants(): Promise<MerchantRecord[]> {
   const now = Date.now()
   if (cachedMerchants && now - cachedAt < CACHE_TTL_MS) return cachedMerchants
@@ -57,7 +62,7 @@ export async function GET(req: NextRequest) {
       minMatchCharLength: 2,
     })
 
-    const hits = fuse.search(q, { limit: 10 })
+    const hits = fuse.search(q, { limit: 10 }).filter(h => (h.score ?? 1) <= SCORE_CUTOFF)
 
     if (hits.length > 0) {
       return NextResponse.json({

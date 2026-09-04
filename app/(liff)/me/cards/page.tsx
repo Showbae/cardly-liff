@@ -5,14 +5,21 @@ import { useRouter } from 'next/navigation'
 import { Reorder, useDragControls } from 'framer-motion'
 import { initLiff, getLiffProfile } from '@/lib/liff'
 import { signInWithLine } from '@/lib/auth'
-import { getMyCards, removeCard, reorderCards, type UserCard } from '@/lib/cards'
+import { getMyCards, reorderCards, type UserCard } from '@/lib/cards'
 import { AddCardWizard } from '@/components/liff/AddCardWizard'
 import { EditCardSheet } from '@/components/liff/EditCardSheet'
+import { DeleteCardSheet } from '@/components/liff/DeleteCardSheet'
 import { chipGradient, bankInitial } from '@/lib/card-utils'
 
-const XIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+const TrashIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+  </svg>
+)
+
+const ChevronRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
   </svg>
 )
 
@@ -31,7 +38,8 @@ export default function MyCardsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
-  const [removing, setRemoving] = useState<string | null>(null)
+  const [manageMode, setManageMode] = useState(false)
+  const [deletingCard, setDeletingCard] = useState<UserCard | null>(null)
   const [editingCard, setEditingCard] = useState<UserCard | null>(null)
 
   const loadMyCards = useCallback(async (uid: string) => {
@@ -57,17 +65,6 @@ export default function MyCardsPage() {
     }
     init()
   }, [loadMyCards])
-
-  const handleRemove = async (userCardId: string) => {
-    if (!confirm('ลบบัตรนี้? รายการที่บันทึกไว้จะถูกลบด้วย')) return
-    setRemoving(userCardId)
-    try {
-      await removeCard(userCardId)
-      setMyCards(prev => prev.filter(c => c.id !== userCardId))
-    } finally {
-      setRemoving(null)
-    }
-  }
 
   const handleReorderCommit = useCallback((ordered: UserCard[]) => {
     if (!userId) return
@@ -115,7 +112,17 @@ export default function MyCardsPage() {
           ฉัน
         </button>
         <span className="text-[15px] font-semibold text-ink">บัตรของฉัน</span>
-        <div />
+        {hasCards ? (
+          <button
+            onClick={() => setManageMode(m => !m)}
+            className="text-[14px] py-2"
+            style={{ color: 'var(--brand-600)', justifySelf: 'end', fontWeight: manageMode ? 700 : 500 }}
+          >
+            {manageMode ? 'เสร็จ' : 'จัดการ'}
+          </button>
+        ) : (
+          <div />
+        )}
       </div>
 
       {/* Scrollable content */}
@@ -129,9 +136,9 @@ export default function MyCardsPage() {
                   key={uc.id}
                   uc={uc}
                   index={i}
-                  removing={removing}
+                  manageMode={manageMode}
                   onEdit={setEditingCard}
-                  onRemove={handleRemove}
+                  onRequestDelete={setDeletingCard}
                   onDragEnd={() => handleReorderCommit(myCards)}
                 />
               ))}
@@ -189,18 +196,30 @@ export default function MyCardsPage() {
           }}
         />
       )}
+
+      {deletingCard && (
+        <DeleteCardSheet
+          card={deletingCard}
+          onClose={() => setDeletingCard(null)}
+          onDeleted={id => {
+            setMyCards(prev => prev.filter(c => c.id !== id))
+            if (myCards.length <= 1) setManageMode(false)
+            setDeletingCard(null)
+          }}
+        />
+      )}
     </div>
   )
 }
 
 function SortableCardRow({
-  uc, index, removing, onEdit, onRemove, onDragEnd,
+  uc, index, manageMode, onEdit, onRequestDelete, onDragEnd,
 }: {
   uc: UserCard
   index: number
-  removing: string | null
+  manageMode: boolean
   onEdit: (uc: UserCard) => void
-  onRemove: (id: string) => void
+  onRequestDelete: (uc: UserCard) => void
   onDragEnd: () => void
 }) {
   const dragControls = useDragControls()
@@ -219,19 +238,21 @@ function SortableCardRow({
       className="flex items-center gap-[13px] py-[14px] bg-bg"
       style={{ borderTop: index === 0 ? 'none' : '1px solid var(--line-soft)' }}
     >
-      <div
-        onPointerDown={e => dragControls.start(e)}
-        onClick={e => e.stopPropagation()}
-        className="shrink-0 flex items-center justify-center text-ink-4"
-        style={{ width: 20, touchAction: 'none', cursor: 'grab' }}
-        aria-label="ลากเพื่อสลับลำดับ"
-      >
-        <DragHandleIcon />
-      </div>
+      {manageMode && (
+        <div
+          onPointerDown={e => dragControls.start(e)}
+          onClick={e => e.stopPropagation()}
+          className="shrink-0 flex items-center justify-center text-ink-4"
+          style={{ width: 20, touchAction: 'none', cursor: 'grab' }}
+          aria-label="ลากเพื่อสลับลำดับ"
+        >
+          <DragHandleIcon />
+        </div>
+      )}
       <div
         className="flex items-center gap-[13px] flex-1 min-w-0"
-        style={{ cursor: 'pointer' }}
-        onClick={() => onEdit(uc)}
+        style={{ cursor: manageMode ? 'default' : 'pointer' }}
+        onClick={manageMode ? undefined : () => onEdit(uc)}
       >
         <div
           className="shrink-0 flex items-center justify-center text-white font-bold text-[13px] relative overflow-hidden"
@@ -282,18 +303,18 @@ function SortableCardRow({
             )}
           </div>
         </div>
+        {!manageMode && <span className="shrink-0"><ChevronRightIcon /></span>}
       </div>
-      <button
-        onClick={e => { e.stopPropagation(); onRemove(uc.id) }}
-        disabled={removing === uc.id}
-        className="w-7 h-7 flex items-center justify-center text-ink-4 shrink-0"
-        style={{ borderRadius: 999, background: 'var(--surface-2)', border: 'none', cursor: 'pointer' }}
-        aria-label="ลบบัตร"
-      >
-        {removing === uc.id
-          ? <span className="w-3 h-3 border-2 border-ink-4 border-t-transparent rounded-full animate-spin" />
-          : <XIcon />}
-      </button>
+      {manageMode && (
+        <button
+          onClick={e => { e.stopPropagation(); onRequestDelete(uc) }}
+          className="w-7 h-7 flex items-center justify-center shrink-0"
+          style={{ borderRadius: 999, background: 'var(--danger-tint)', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}
+          aria-label="ลบบัตร"
+        >
+          <TrashIcon />
+        </button>
+      )}
     </Reorder.Item>
   )
 }

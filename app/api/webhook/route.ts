@@ -12,6 +12,24 @@ function verifySignature(rawBody: string, signature: string): boolean {
   return digest === signature
 }
 
+// ── Session helpers ────────────────────────────────────────────────────
+const SESSION_TIMEOUT_MINUTES = 15
+const EXPIRED_MESSAGE = 'รายการที่ค้างไว้หมดเวลาแล้วครับ ⏱️\nพิมพ์ "จดรายจ่าย" เพื่อเริ่มใหม่ได้เลย'
+
+// Sessions older than SESSION_TIMEOUT_MINUTES are treated as abandoned and
+// swept on next access — no separate cron needed for this volume.
+async function getActiveSession(lineUserId: string) {
+  const session = await prisma.bot_sessions.findUnique({ where: { line_user_id: lineUserId } })
+  if (!session) return { session: null, expired: false }
+
+  const ageMs = Date.now() - session.updated_at.getTime()
+  if (ageMs > SESSION_TIMEOUT_MINUTES * 60_000) {
+    await prisma.bot_sessions.delete({ where: { line_user_id: lineUserId } }).catch(() => {})
+    return { session: null, expired: true }
+  }
+  return { session, expired: false }
+}
+
 // ── Main handler ─────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -43,7 +61,7 @@ async function handleEvent(event: LineEvent) {
 // ── Text message handler ─────────────────────────────────────────────
 async function handleText(lineUserId: string, text: string, replyToken: string) {
   const trimmed = text.trim()
-  const session = await prisma.bot_sessions.findUnique({ where: { line_user_id: lineUserId } })
+  const { session, expired } = await getActiveSession(lineUserId)
 
   // Trigger keyword — start or restart the flow
   if (trimmed === 'จดรายจ่าย') {
@@ -75,8 +93,12 @@ async function handleText(lineUserId: string, text: string, replyToken: string) 
     return
   }
 
-  // No active session and not a trigger keyword — ignore
-  if (!session) return
+  // No active session and not a trigger keyword — ignore (unless it just
+  // expired, in which case let them know instead of going silent)
+  if (!session) {
+    if (expired) await reply(replyToken, [{ type: 'text', text: EXPIRED_MESSAGE }])
+    return
+  }
 
   // Cancel keyword — works from any step
   if (trimmed === 'ยกเลิก') {
@@ -140,8 +162,11 @@ async function handlePostback(lineUserId: string, postbackData: string, replyTok
 
   // Card selection from quick reply
   if (cardId) {
-    const session = await prisma.bot_sessions.findUnique({ where: { line_user_id: lineUserId } })
-    if (!session || session.step !== 'awaiting_card') return
+    const { session, expired } = await getActiveSession(lineUserId)
+    if (!session || session.step !== 'awaiting_card') {
+      if (expired) await reply(replyToken, [{ type: 'text', text: EXPIRED_MESSAGE }])
+      return
+    }
     await prisma.bot_sessions.update({
       where: { line_user_id: lineUserId },
       data: { step: 'awaiting_merchant', data: { usersCardId: cardId } },
@@ -151,8 +176,11 @@ async function handlePostback(lineUserId: string, postbackData: string, replyTok
   }
 
   if (action === 'confirm') {
-    const session = await prisma.bot_sessions.findUnique({ where: { line_user_id: lineUserId } })
-    if (!session || session.step !== 'awaiting_confirm') return
+    const { session, expired } = await getActiveSession(lineUserId)
+    if (!session || session.step !== 'awaiting_confirm') {
+      if (expired) await reply(replyToken, [{ type: 'text', text: EXPIRED_MESSAGE }])
+      return
+    }
 
     const data = session.data as Record<string, string>
 
@@ -172,6 +200,9 @@ async function handlePostback(lineUserId: string, postbackData: string, replyTok
         amount: parseFloat(data.amount),
         note: merchant ? null : data.merchant,
         spent_at: new Date(),
+        // บันทึกผ่าน LINE chat ไม่ใช่ในแอป — แยกให้ชัดเพื่อวัดว่าช่องทางไหน
+        // ถูกใช้จริง (ป้อน #24 Chat-based Quick Advisor)
+        source: 'chat',
       },
     })
 

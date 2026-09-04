@@ -1,6 +1,7 @@
 'use client'
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { TouchEvent } from 'react'
 
 const STORAGE_KEY = 'cardly-recent-searches'
 const MAX_RECENT = 5
@@ -56,6 +57,36 @@ function SearchOverlay({ open, onClose, onSelect }, ref) {
     }
   }, [open])
 
+  // Lock the page behind so only the overlay scrolls while it is open.
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [open])
+
+  // Drag the handle down to dismiss.
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragStartY = useRef<number | null>(null)
+
+  useEffect(() => { if (!open) setDragY(0) }, [open])
+
+  const onDragStart = (e: TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY
+    setDragging(true)
+  }
+  const onDragMove = (e: TouchEvent) => {
+    if (dragStartY.current === null) return
+    setDragY(Math.max(0, e.touches[0].clientY - dragStartY.current))
+  }
+  const onDragEnd = () => {
+    setDragging(false)
+    dragStartY.current = null
+    if (dragY > 90) onClose()
+    else setDragY(0)
+  }
+
   // Debounced search
   useEffect(() => {
     const q = query.trim()
@@ -100,27 +131,40 @@ function SearchOverlay({ open, onClose, onSelect }, ref) {
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="fixed inset-0 z-40 transition-opacity duration-300"
+        className="fixed inset-0 z-[70] transition-opacity duration-300"
         style={{
           background: 'rgba(6,20,14,0.52)',
           backdropFilter: 'blur(3px)',
           WebkitBackdropFilter: 'blur(3px)',
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',
+          touchAction: 'none',
         }}
       />
 
       {/* Sheet */}
       <div
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col transition-transform duration-300 ease-out"
+        className="fixed inset-x-0 bottom-0 z-[71] flex flex-col transition-transform duration-300 ease-out"
         style={{
           top: 72,
           borderRadius: '22px 22px 0 0',
           background: 'var(--surface)',
           boxShadow: '0 -8px 30px rgba(15,31,24,.12)',
-          transform: open ? 'translateY(0)' : 'translateY(100%)',
+          transform: open ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition: dragging ? 'none' : undefined,
         }}
       >
+        {/* Drag handle — pull down to dismiss */}
+        <div
+          onTouchStart={onDragStart}
+          onTouchMove={onDragMove}
+          onTouchEnd={onDragEnd}
+          className="shrink-0"
+          style={{ padding: '8px 0 4px', cursor: 'grab', touchAction: 'none' }}
+        >
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)', margin: '0 auto' }} />
+        </div>
+
         {/* Search input */}
         <div
           className="flex items-center gap-2.5 mx-3.5 mt-3 px-3.5 py-[10px] shrink-0"

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { initLiff, getLiffProfile } from '@/lib/liff'
+import { signInWithLine } from '@/lib/auth'
 
 // ── Types ────────────────────────────────────────────────────
 interface Category {
@@ -24,6 +26,8 @@ interface Promo {
   categories: { name_th: string | null; icon: string | null } | null
   promotion_merchants: Array<{ merchants: { name_th: string | null } | null }>
 }
+
+type Scope = 'all' | 'mine'
 
 // ── Helpers ──────────────────────────────────────────────────
 function daysLeft(endDate: string | null): number | null {
@@ -155,6 +159,8 @@ export default function PromoPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
+  const [scope, setScope] = useState<Scope>('all')
+  const [userId, setUserId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -165,16 +171,37 @@ export default function PromoPage() {
   }, [])
 
   useEffect(() => {
+    const init = async () => {
+      try {
+        await initLiff()
+        const profile = await getLiffProfile()
+        const dbUser = profile
+          ? await signInWithLine({ userId: profile.userId, displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? '' })
+          : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀' }
+        setUserId(dbUser.id)
+      } catch {
+        setUserId(null)
+      }
+    }
+    init()
+  }, [])
+
+  useEffect(() => {
+    // scope 'mine' ต้องรอ userId ก่อน ไม่งั้นจะยิงเป็น 'all' แล้วกระพริบ
+    if (scope === 'mine' && !userId) return
+
     setIsLoading(true)
-    const url = selectedCat
-      ? `/api/promotions?categoryId=${selectedCat}`
-      : '/api/promotions'
-    fetch(url)
+    const params = new URLSearchParams()
+    if (selectedCat) params.set('categoryId', selectedCat)
+    if (scope === 'mine' && userId) params.set('userId', userId)
+
+    const query = params.toString()
+    fetch(query ? `/api/promotions?${query}` : '/api/promotions')
       .then(r => r.json())
-      .then(setPromos)
+      .then(data => setPromos(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setIsLoading(false))
-  }, [selectedCat])
+  }, [selectedCat, scope, userId])
 
   return (
     <div className="min-h-screen bg-bg">
@@ -187,6 +214,33 @@ export default function PromoPage() {
         <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-.5px', color: 'var(--ink)', marginTop: 4, lineHeight: 1 }}>
           {isLoading ? '–' : promos.length} รายการ
         </h1>
+      </div>
+
+      {/* Scope toggle */}
+      <div style={{ padding: '4px 20px 12px' }}>
+        <div style={{
+          display: 'inline-flex', gap: 2, padding: 3, borderRadius: 99,
+          background: 'var(--surface-2)', border: '1px solid var(--line)',
+        }}>
+          {([
+            { id: 'all',  label: 'ทั้งหมด'      },
+            { id: 'mine', label: 'เฉพาะบัตรฉัน' },
+          ] as const).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setScope(opt.id)}
+              style={{
+                padding: '6px 16px', borderRadius: 99, fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+                background: scope === opt.id ? 'var(--surface)' : 'transparent',
+                color: scope === opt.id ? 'var(--ink)' : 'var(--ink-3)',
+                boxShadow: scope === opt.id ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Category filter tabs */}
@@ -235,7 +289,21 @@ export default function PromoPage() {
         ) : promos.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-4)' }}>
             <div style={{ fontSize: 36 }}>🏷️</div>
-            <div style={{ fontSize: 14, marginTop: 10 }}>ไม่พบโปรโมชั่น</div>
+            <div style={{ fontSize: 14, marginTop: 10 }}>
+              {scope === 'mine' ? 'ไม่มีโปรที่บัตรของคุณใช้ได้' : 'ไม่พบโปรโมชั่น'}
+            </div>
+            {scope === 'mine' && (
+              <button
+                onClick={() => setScope('all')}
+                style={{
+                  marginTop: 12, padding: '7px 16px', borderRadius: 99,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  background: 'var(--surface)', color: 'var(--ink-2)', border: '1px solid var(--line)',
+                }}
+              >
+                ดูโปรทั้งหมด
+              </button>
+            )}
           </div>
         ) : (
           promos.map(p => <PromoCard key={p.id} p={p} />)

@@ -1,74 +1,56 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { initLiff, getLiffProfile } from '@/lib/liff'
 import { signInWithLine } from '@/lib/auth'
 import { getMyCards, type UserCard } from '@/lib/cards'
-import { chipGradient, bankInitial, THAI_MONTHS } from '@/lib/card-utils'
+import { getCardProfile, type CardProfile } from '@/lib/card-profile'
+import { BenefitsTab } from '@/components/liff/BenefitsTab'
+import { TransactionList } from '@/components/liff/TransactionList'
+import { chipGradient, bankInitial } from '@/lib/card-utils'
 
-interface Merchant {
-  id: string
-  name_th: string | null
-  name_eng: string | null
-  categories: { icon: string | null } | null
-}
+/**
+ * หน้าบัตรหนึ่งใบ — hero บัตร + สองแท็บ (การตัดสินใจข้อ 1 ใน docs/admin-portal.md)
+ *
+ *   สิทธิประโยชน์ → ดีไซน์แบบ ค · ของที่มีวันหมดขึ้นบน สิทธิ์ถาวรพับเป็น accordion
+ *   รายการ        → ลิสต์ธุรกรรมของเดิม ย้ายไป components/liff/TransactionList
+ *
+ * โครงนี้เผื่อแท็บที่สาม (#10 Analytics) ไว้แล้ว ไม่ต้องรื้อตอนเพิ่ม
+ */
 
-interface Transaction {
-  id: string
-  amount: number
-  spent_at: string
-  note: string | null
-  merchants: Merchant | null
-}
+type TabKey = 'benefits' | 'transactions'
 
-interface MonthGroup {
-  label: string
-  total: number
-  txs: Transaction[]
-}
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'benefits', label: 'สิทธิประโยชน์' },
+  { key: 'transactions', label: 'รายการ' },
+]
 
-function groupByMonth(txs: Transaction[]): MonthGroup[] {
-  const map = new Map<string, MonthGroup>()
-  for (const tx of txs) {
-    const d = new Date(tx.spent_at)
-    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
-    if (!map.has(key)) {
-      map.set(key, {
-        label: `${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`,
-        total: 0,
-        txs: [],
-      })
-    }
-    const g = map.get(key)!
-    g.total += tx.amount
-    g.txs.push(tx)
-  }
-  return Array.from(map.values())
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]}.`
-}
-
-export default function CardTransactionsPage() {
+export default function CardDetailPage() {
   const router = useRouter()
   const params = useParams()
   const cardId = params.cardId as string
 
   const [card, setCard] = useState<UserCard | null>(null)
-  const [groups, setGroups] = useState<MonthGroup[]>([])
+  const [profile, setProfile] = useState<CardProfile | null>(null)
+  const [tab, setTab] = useState<TabKey>('benefits')
+  const [editMode, setEditMode] = useState(false)
+  const [hasTx, setHasTx] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const onHasTransactionsChange = useCallback((has: boolean) => {
+    setHasTx(has)
+    if (!has) setEditMode(false)
+  }, [])
 
   useEffect(() => {
     const init = async () => {
       try {
         await initLiff()
-        const profile = await getLiffProfile()
-        const dbUser = profile
-          ? await signInWithLine({ userId: profile.userId, displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? '' })
+        const liffProfile = await getLiffProfile()
+        const dbUser = liffProfile
+          ? await signInWithLine({ userId: liffProfile.userId, displayName: liffProfile.displayName, pictureUrl: liffProfile.pictureUrl ?? '' })
           : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀' }
 
         const cards = await getMyCards(dbUser.id)
@@ -76,10 +58,12 @@ export default function CardTransactionsPage() {
         setCard(found)
 
         if (found) {
-          const res = await fetch(`/api/transactions?usersCardId=${encodeURIComponent(cardId)}`)
-          if (!res.ok) throw new Error('fetch failed')
-          const txs: Transaction[] = await res.json()
-          setGroups(groupByMonth(txs))
+          // ข้อมูลระดับผลิตภัณฑ์ · ไม่กระทบแท็บรายการถ้าดึงไม่ได้
+          try {
+            setProfile(await getCardProfile(cardId))
+          } catch {
+            setProfile({ card: null, promos: [], benefits: [], perks: [] })
+          }
         }
       } catch (err) {
         setError('เกิดข้อผิดพลาด: ' + String(err))
@@ -130,7 +114,7 @@ export default function CardTransactionsPage() {
         </button>
 
         {/* Card hero */}
-        <div className="flex items-center gap-4 pb-5" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+        <div className="flex items-center gap-4 pb-[17px]">
           <div
             className="flex items-center justify-center font-bold text-white text-[16px] relative overflow-hidden flex-shrink-0"
             style={{
@@ -158,65 +142,57 @@ export default function CardTransactionsPage() {
             )}
           </div>
         </div>
+
+        {/* Tabs — ปุ่ม "แก้ไข" ย้ายมาอยู่แถวนี้ ใช้ได้เฉพาะแท็บรายการ */}
+        <div className="flex items-center" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+          <div className="flex gap-[26px]">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="text-[14px] font-semibold pb-[11px]"
+                style={{
+                  color: tab === t.key ? 'var(--ink)' : 'var(--ink-4)',
+                  borderBottom: `2px solid ${tab === t.key ? 'var(--brand-500)' : 'transparent'}`,
+                  marginBottom: -1,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {tab === 'transactions' && hasTx && (
+            <button
+              onClick={() => setEditMode(m => !m)}
+              className="ml-auto text-[14px] font-semibold pb-[11px]"
+              style={{ color: editMode ? 'var(--brand-700)' : 'var(--ink-3)' }}
+            >
+              {editMode ? 'เสร็จ' : 'แก้ไข'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Transaction list */}
-      <div className="flex-1 overflow-y-auto px-[22px]" style={{ scrollbarWidth: 'none', overscrollBehavior: 'contain' }}>
-        {groups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
-            <div className="text-[32px]">📭</div>
-            <p className="text-[14px] font-semibold text-ink-3">ยังไม่มีรายการ</p>
-            <p className="text-[12px] text-ink-4">บันทึกยอดหลังจากรูดบัตรใน Cardly</p>
-          </div>
-        ) : (
-          groups.map(group => (
-            <div key={group.label}>
-              {/* Month header */}
-              <div
-                className="flex justify-between items-baseline py-[14px] sticky top-0 z-10"
-                style={{ background: 'var(--bg)' }}
-              >
-                <span className="text-[13px] font-bold text-ink-2">{group.label}</span>
-                <span className="text-[13px] font-bold text-ink-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {'฿' + group.total.toLocaleString('th-TH', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-
-              {/* Transactions */}
-              {group.txs.map((tx, i) => {
-                const m = tx.merchants
-                const merchantName = m?.name_eng ?? m?.name_th ?? tx.note ?? '—'
-                const icon = m?.categories?.icon ?? '💳'
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center gap-3 py-[11px]"
-                    style={{ borderTop: i === 0 ? '1px solid var(--line-soft)' : '1px solid var(--line-soft)' }}
-                  >
-                    <div
-                      className="flex items-center justify-center text-[18px] flex-shrink-0"
-                      style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--surface-2)' }}
-                    >
-                      {icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-ink truncate">{merchantName}</div>
-                      <div className="text-[11px] text-ink-4 mt-0.5">{formatDate(tx.spent_at)}</div>
-                    </div>
-                    <div
-                      className="text-[14px] font-bold text-ink flex-shrink-0"
-                      style={{ fontVariantNumeric: 'tabular-nums' }}
-                    >
-                      {'฿' + tx.amount.toLocaleString('th-TH', { maximumFractionDigits: 0 })}
-                    </div>
-                  </div>
-                )
-              })}
-              <div style={{ height: 8 }} />
+      {/* Tab body */}
+      <div
+        className="flex-1 overflow-y-auto px-[22px] pt-[18px]"
+        style={{ scrollbarWidth: 'none', overscrollBehavior: 'contain' }}
+      >
+        {tab === 'benefits' ? (
+          profile ? (
+            <BenefitsTab profile={profile} />
+          ) : (
+            <div className="flex justify-center py-16">
+              <div className="w-7 h-7 border-[3px] border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
-          ))
+          )
+        ) : (
+          <TransactionList
+            cardId={cardId}
+            editMode={editMode}
+            onHasTransactionsChange={onHasTransactionsChange}
+          />
         )}
-        <div style={{ height: 24 }} />
       </div>
     </div>
   )

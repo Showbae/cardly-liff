@@ -55,6 +55,8 @@ export function PostCloseLogCard({ merchant, recommendations, onDismiss }: Props
           usersCardId: selectedCard.usersCardId,
           merchantId: merchant.id,
           amount: parseFloat(amount),
+          // อันดับ 1 ที่ engine จัดให้ — เทียบกับ usersCardId ที่ user เลือกจริง
+          recommendedCardId: recommendations[0]?.card.usersCardId,
         }),
       })
       setSaved(true)

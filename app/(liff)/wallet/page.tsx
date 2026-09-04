@@ -77,15 +77,6 @@ export default function WalletPage() {
             <span className="text-[16px] font-medium tracking-[-0.3px] text-ink-3 ml-1">ใบ</span>
           </h1>
         </div>
-        <div
-          className="w-9 h-9 flex items-center justify-center text-ink-3 flex-shrink-0"
-          style={{ borderRadius: 999, border: '1px solid var(--line)', background: 'var(--surface)' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth={1.75} strokeLinecap="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </div>
       </div>
 
       {/* Scrollable content */}

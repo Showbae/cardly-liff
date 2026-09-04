@@ -438,6 +438,10 @@ export function RecommendSheet({ merchant, userId, open, onClose, onBackToSearch
           usersCardId: logCard.usersCardId,
           merchantId: merchant?.id,
           amount: parseFloat(logAmount),
+          // บัตรที่ engine จัดอันดับ 1 — ใช้ data.recommendations ไม่ใช่ sorted
+          // เพราะ sorted อาจถูก user เรียงใหม่เอง ซึ่งเป็นการสำรวจของ user
+          // ไม่ใช่คำแนะนำของระบบ · เทียบกับ usersCardId แล้วรู้ว่าทำตามไหม
+          recommendedCardId: data?.recommendations?.[0]?.card.usersCardId,
         }),
       })
       setSaved(true)
