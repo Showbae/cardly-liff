@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from 'next/server'
+
+/**
+ * ด่านหน้าของทุก request ที่ตรง `config.matcher` ข้างล่าง
+ *
+ * ── ทำอะไรและไม่ทำอะไร ────────────────────────────────────────────────
+ *
+ * middleware เช็กแค่ว่า **มี session cookie ติดมาไหม** ไม่ได้ตรวจว่า token
+ * นั้นใช้ได้จริง เพราะการตรวจจริงต้อง query DB ซึ่งจะรันทุก request ที่ตรง
+ * matcher — เปลืองและช้าโดยไม่จำเป็น
+ *
+ * งานของมันคือ **เด้ง request ที่ไม่มี cookie ออกตั้งแต่ต้นทาง** ซึ่งครอบ
+ * เคสส่วนใหญ่ (คนที่ยังไม่ล็อกอิน) ส่วน cookie ปลอมจะผ่านด่านนี้ไปได้ และ
+ * ไปตายที่ชั้นสองแทน:
+ *
+ *   Server Component / layout  → `getAdmin()`   จาก lib/admin-guard
+ *   Route handler /api/admin/* → `requireAdmin()` จาก lib/admin-guard
+ *
+ * **ทั้งสองที่ต้องเรียกเสมอ** — อย่าคิดว่า middleware กันให้แล้ว
+ *
+ * ── หมายเหตุสำหรับ tech-debt 🔴 2 (session auth ของ LIFF) ──────────────
+ *
+ * งานนั้นจะเพิ่ม `liffGuard` เข้ามาในไฟล์นี้ ซึ่งตรวจจาก
+ * `Authorization: Bearer` แทน cookie · โครงข้างล่างแยกฟังก์ชันไว้ให้แล้ว
+ * ให้เติม `liffGuard` แล้วขยาย `matcher` — อย่าเขียนทับ `adminGuard`
+ */
+
+const ADMIN_COOKIE = 'cardly_admin_session'
+
+function adminGuard(req: NextRequest): NextResponse {
+  const hasCookie = Boolean(req.cookies.get(ADMIN_COOKIE)?.value)
+  if (hasCookie) return NextResponse.next()
+
+  // API ตอบ 401 · หน้าเว็บเด้งไป login พร้อมจำปลายทางไว้
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const loginUrl = new URL('/admin/login', req.url)
+  loginUrl.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search)
+  return NextResponse.redirect(loginUrl)
+}
+
+export function middleware(req: NextRequest): NextResponse {
+  const path = req.nextUrl.pathname
+
+  // หน้า login กับ API login/logout ต้องเข้าถึงได้โดยไม่ต้องมี session
+  if (path === '/admin/login' || path.startsWith('/api/admin/login') || path.startsWith('/api/admin/logout')) {
+    return NextResponse.next()
+  }
+
+  if (path.startsWith('/admin') || path.startsWith('/api/admin')) {
+    return adminGuard(req)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  // ครอบ API ด้วย — guard ใน layout.tsx ไม่กัน route handler
+  // ห้ามครอบ (liff) หรือ /api/cards/* ไม่งั้น user LINE เข้าแอปไม่ได้
+  matcher: ['/admin/:path*', '/api/admin/:path*'],
+}
