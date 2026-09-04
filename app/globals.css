@@ -38,6 +38,9 @@
   --warn-bg: #fdece1;
   --info:    #2f6bd9;
   --info-bg: #e3edfb;
+  --danger:      #c0392b;
+  --danger-deep: #9c2a1f;
+  --danger-tint: rgba(192,57,43,.09);
 
   /* Shadows */
   --shadow-sm:   0 1px 2px rgba(15,31,24,.06), 0 1px 1px rgba(15,31,24,.04);
@@ -52,6 +55,35 @@
   --r-lg:   18px;
   --r-xl:   22px;
   --r-card: 16px;
+}
+
+/* ── shadcn/ui aliases (admin portal เท่านั้น) ──────────────────────────
+   คอมโพเนนต์ของ shadcn อ้างชื่อ token ชุดนี้ตายตัว — ชี้กลับมาที่ token
+   ของ Cardly ข้างบน เพื่อให้มีความจริงชุดเดียวในระบบ ไม่ใช่สองชุดขนานกัน
+
+   แก้สีที่บล็อกข้างบนที่เดียว ทั้ง LIFF และ admin เปลี่ยนตาม
+   LIFF ไม่ได้ใช้ตัวแปรกลุ่มนี้เลย                                        */
+:root {
+  --background:          var(--bg);
+  --foreground:          var(--ink);
+  --card:                var(--surface);
+  --card-foreground:     var(--ink);
+  --popover:             var(--surface);
+  --popover-foreground:  var(--ink);
+  --primary:             var(--brand-600);
+  --primary-foreground:  #ffffff;
+  --secondary:           var(--surface-2);
+  --secondary-foreground: var(--ink-2);
+  --muted:               var(--surface-2);
+  --muted-foreground:    var(--ink-3);
+  --accent:              var(--brand-50);
+  --accent-foreground:   var(--brand-700);
+  --destructive:         var(--danger);
+  --destructive-foreground: #ffffff;
+  --border:              var(--line);
+  --input:               var(--line);
+  --ring:                var(--brand-500);
+  --radius:              var(--r-sm);
 }
 
 html {
@@ -79,4 +111,10 @@ button, a, [role="button"] {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Gentle float for the card hero in the delete-confirm sheet */
+@keyframes cardFloat {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50%      { transform: rotate(-3deg) translateY(-4px); }
 }
