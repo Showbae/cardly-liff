@@ -9,6 +9,11 @@ This file provides guidance to Claude Code when working with this project.
 > **อ่านไฟล์นี้ก่อนทุกครั้งที่มีคำถามเกี่ยวกับ product, feature, segment, หรือ roadmap:**
 > **`docs/product-strategy.md`** — Product Vision, Customer Segments (7 กลุ่ม), Master Backlog (22 features, 337 SP), และ Roadmap แบ่งเป็น 5 Phase
 
+> **อ่านไฟล์นี้ก่อนทุกครั้งที่จะเขียน query, แก้ schema, หรือแตะ logic ที่อ่านข้อมูลจาก DB:**
+> **`docs/data-model.md`** — ความหมายของแต่ละตาราง (แถวหนึ่งคืออะไร · `NULL` แปลว่าอะไร) พร้อมตัวอย่างข้อมูล
+>
+> เหตุผลที่บังคับ: สคีมานี้มีกฎที่**อ่านโค้ดแล้วเดาไม่ได้** — เช่น promo ที่ไม่มีแถวใน `promotion_cards` แปลว่า *ใช้ได้กับบัตรทุกใบของธนาคารนั้น* ไม่ใช่ *ใช้ไม่ได้เลย* เขียน query โดยไม่รู้กฎพวกนี้จะได้ผลลัพธ์ที่ดูถูกแต่ผิด
+
 ---
 
 ## Project Overview
@@ -273,7 +278,8 @@ export const getLiffProfile = async () => {
 - `main` branch → Production
 - `develop` branch → Preview deployment
 - Set all environment variables in Vercel dashboard (not in repo)
-- Serverless function timeout: default 10s (upgrade plan for longer)
+- Deploy เป็น **project เดียว** ทั้ง LIFF และ admin portal — เหตุผลและราคาที่จ่ายอยู่ที่ `docs/admin-portal.md` หัวข้อ "ข้อ 12 ต่อ"
+- Function timeout: **300s ทั้ง Hobby และ Pro** (Pro ตั้งได้ถึง 800s) — ไม่ใช่ 10s ตามที่เอกสารนี้เคยเขียนไว้
 
 ### Database Migrations
 - Run `npx prisma migrate deploy` as part of the build step or a separate CI job before deployment
@@ -309,7 +315,7 @@ npm run build
 
 ## Important Notes
 
-1. **Serverless Limits**: Vercel Serverless Functions have a 10s timeout on Hobby plan. Avoid long-running operations in API routes; use background jobs or webhooks instead.
+1. **Serverless Limits**: Vercel Functions มี timeout **300s ทั้ง Hobby และ Pro** (Fluid Compute เป็นค่า default) — ตัวเลข 10s ที่เคยเขียนไว้ล้าสมัยแล้ว · ยังควรเลี่ยงงานยาวใน API route อยู่ดี เพราะ Active CPU คิดเงินตามเวลาที่ CPU ทำงานจริง แต่ **ไม่ต้องหลบ 10s อีกต่อไป**
 2. **Prisma + Serverless**: Always use the Prisma singleton pattern to avoid exhausting database connections on Vercel.
 3. **LIFF + SSR**: LIFF SDK is browser-only. Never call LIFF methods in Server Components or during SSR.
 4. **Supabase RLS**: Enable Row Level Security (RLS) on all Supabase tables. Use `SUPABASE_SERVICE_ROLE_KEY` only in server-side code and never expose it to the client.
