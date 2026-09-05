@@ -102,7 +102,7 @@ benefit เป็นข้อมูล **ระดับผลิตภัณฑ
 
 ## แผนงาน
 
-**ความคืบหน้า** (อัปเดต 2026-08-07)
+**ความคืบหน้า** (อัปเดต 2026-09-05 · สถานะ schema ยืนยันกับ DB จริงแล้ว ไม่ใช่จากไฟล์ SQL)
 
 | Phase | สถานะ |
 |---|---|
@@ -115,7 +115,7 @@ benefit เป็นข้อมูล **ระดับผลิตภัณฑ
 
 | 5 · LIFF หน้าจอ | ✅ 4/4 (2026-08-07) — `/api/cards/my/[id]/profile` · `lib/card-profile.ts` · แยก `TransactionList` · `BenefitsTab` แบบ ค · empty state · **ยังไม่มี route test** |
 | 6 · Engine | ⬜ |
-| 7 · ปิดช่องว่างข้อมูล | ✅ โค้ดเสร็จ · **SQL ยังไม่ได้รัน** — ดูหัวข้อข้างล่าง |
+| 7 · ปิดช่องว่างข้อมูล | ✅ เสร็จ — `005` รันแล้ว · `schema.prisma` ตรงกับ DB (`db pull --print` ไม่มี drift) · เหลือ constraint ตัวเดียวที่ยัง `NOT VALID` — ดูหัวข้อข้างล่าง |
 
 ---
 
@@ -123,8 +123,11 @@ benefit เป็นข้อมูล **ระดับผลิตภัณฑ
 
 ตรวจ admin portal เทียบกับเว็บบัตรจริง แล้วพบ 13 ช่องว่าง — แก้ครบทั้งหมดแล้ว
 
-> ⛔ **ต้องรัน `prisma/sql/005_cap_basis_and_engine_gaps.sql` ที่ Supabase ก่อน** แล้วตามด้วย `npx prisma db pull && npx prisma generate`
-> `schema.prisma` ถูกแก้ด้วยมือให้ตรงกับ SQL ไว้แล้วเพื่อให้ repo typecheck ผ่าน — แต่ **DB จริงยังไม่มีคอลัมน์พวกนี้** ถ้าเปิดแอปก่อนรัน SQL ทุก query ที่แตะตารางเหล่านี้จะพัง
+> ✅ **`prisma/sql/005_cap_basis_and_engine_gaps.sql` รันที่ Supabase แล้ว** — ยืนยันกับ DB จริง 2026-09-05: คอลัมน์ครบทั้ง 13 ตัว และ `npx prisma db pull --print` ไม่มี drift เทียบกับ `schema.prisma`
+>
+> **เหลืองานเดียว** — `promo_cap_needs_period` ยังเป็น `NOT VALID` (ตั้งใจ · แถวเดิมของ `promotions` ไม่มีทางรู้ว่า `max_cap` หมายถึงอะไร) · พอกรอกข้อมูลจริงครบแล้วรัน `ALTER TABLE public.promotions VALIDATE CONSTRAINT promo_cap_needs_period;`
+>
+> อีก 2 แถวใน `card_base_benefit` ที่ backfill `min_spend_basis='per_slip'` ด้วยการเดา — เป็นแถว `seed-cards` ที่จะโดนลบอยู่แล้ว ไม่ต้องตามแก้
 
 ### ความกำกวมที่แก้ย้อนหลังไม่ได้ (ทำก่อนเปิดให้กรอกข้อมูลจริง)
 
@@ -272,11 +275,11 @@ export const config = {
 | ระดับ | เรื่อง | กระทบงานข้อไหน |
 |---|---|---|
 | 🟠 | `scorePromo` บวก `benefit_value` ข้ามหน่วย | 6.2 |
-| 🟠 | `promotions.max_cap` ไม่มี `cap_period` | 6.2 |
-| 🟠 | `promotion_cards` ว่างทั้งตาราง → ทุกโปรเป็นระดับธนาคาร | **5.3** — คือครึ่งบนของหน้าจอแบบ ค |
+| ✅ | ~~`promotions.max_cap` ไม่มี `cap_period`~~ — `005` เพิ่ม `cap_period` · `cap_basis` · `max_cap_campaign` แล้ว | 6.2 เหลือแค่แก้ `scorePromo` |
+| ✅ | ~~`promotion_cards` ว่างทั้งตาราง~~ — มี 4 แถวแล้ว (จาก `seed-promos`) และ `card_scope` บอกเจตนาตรง ๆ | **5.3** ไม่ถูกบล็อกแล้ว |
 | 🟡 | CLAUDE.md อ้างถึง `middleware.ts` · `lib/supabase/*` · shadcn · TanStack Query · `app/(admin)/` · `prisma migrate dev` ที่ไม่มีอยู่จริง | 0.7 · 2.3 · 3.1 |
-| 🟢 | LIFF auth ซ้ำทุกหน้า (4 ไฟล์) ควรย้ายไป Context | 5.2 — refactor หน้าเดียวกันอยู่แล้ว ทำพร้อมกันได้ |
-| 🟢 | `credit_cards` ขาด `network` · `annual_fee` — **AddCardWizard เก็บ `network` แล้วโยนทิ้งเพราะ API ไม่รับ** | 0.2 — ตัดสินแล้ว เพิ่มพร้อมกัน |
+| 🟢 | LIFF auth ซ้ำทุกหน้า (**6 หน้า** แล้ว) ควรย้ายไป Context | 5.2 — refactor หน้าเดียวกันอยู่แล้ว ทำพร้อมกันได้ |
+| 🟢 | ~~`credit_cards` ขาด `network` · `annual_fee`~~ — คอลัมน์มีแล้ว · **แต่ AddCardWizard ยังโยน `network` ทิ้งอยู่** เพราะ `POST /api/cards/my` ไม่รับ | 0.2 เสร็จ · เหลือทำ picker เป็น read-only |
 
 🔴 ข้อความปลอดภัย (LINE ID token · session auth · hardcode dev user id) **ไม่บล็อกแผนนี้** แต่ต้องเสร็จก่อนเปิดให้คนนอกใช้ — ดู `docs/tech-debt.md`
 

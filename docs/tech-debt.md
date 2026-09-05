@@ -1,6 +1,6 @@
 # Tech Debt — Cardly
 
-รายการหนี้ทางเทคนิคที่รู้ตัวแล้ว · ตรวจกับโค้ดจริงเมื่อ **2026-08-06**
+รายการหนี้ทางเทคนิคที่รู้ตัวแล้ว · ตรวจกับโค้ดจริงเมื่อ **2026-08-06** · **ตรวจซ้ำกับโค้ดและ DB จริง 2026-09-05**
 
 หลายข้อเป็นการ **ตั้งใจ defer** ไม่ใช่ความพลาด — ช่องที่ "ทำไม" อธิบายว่าทำไมถึงยอมรับได้ตอนนี้ และเงื่อนไขไหนที่ทำให้ยอมไม่ได้อีกต่อไป
 
@@ -51,14 +51,15 @@ const user = await prisma.users.upsert({ where: { line_id: String(userId) }, ...
 
 ### 3. Hardcode dev user ID
 
-**สถานะ:** อยู่ใน **4 ไฟล์** (เดิมจดไว้ 2 — เพิ่มขึ้นตามหน้าที่เขียนใหม่)
+**สถานะ:** อยู่ใน **5 ไฟล์** (เดิมจดไว้ 2 → 4 → 5 — เพิ่มขึ้นตามหน้าที่เขียนใหม่ · ยืนยัน 2026-09-05)
 
 | ไฟล์ | บรรทัด |
 |---|---|
 | `app/(liff)/page.tsx` | 90 |
 | `app/(liff)/wallet/page.tsx` | 32 |
-| `app/(liff)/wallet/[cardId]/page.tsx` | 90 |
+| `app/(liff)/wallet/[cardId]/page.tsx` | 54 |
 | `app/(liff)/me/cards/page.tsx` | 57 |
+| `app/(liff)/promo/page.tsx` | 180 |
 
 ```ts
 : { id: '9ee6ee16-d45a-4750-8bcb-ef59285bf2e4', display_name: 'Showbae🍀' }
@@ -70,31 +71,12 @@ const user = await prisma.users.upsert({ where: { line_id: String(userId) }, ...
 
 > จำนวนไฟล์เพิ่มขึ้นเพราะแต่ละหน้า copy-paste auth เอง — แก้ข้อ 🟢 1 (LiffContext) แล้วเหลือจุดเดียว
 
+
 ### 4. Seed data ปลอมยังอยู่ใน DB
 
-**สถานะ:** ยังไม่ล้าง
+**สถานะ:** ยังไม่ล้าง — รายละเอียดและ SQL ที่ถูกต้องอยู่ที่ 🟠 ข้อ 4
 
-ข้อมูลสมมติมาจาก **สอง** script ต้องล้างทั้งคู่ก่อนใส่ข้อมูลจริงจากธนาคาร
-
-| script | สร้างอะไร |
-|---|---|
-| `prisma/seed.ts` | 6 categories · 12 merchants · 20 promotions |
-| `prisma/seed-cards.ts` | 4 point_programs · 8 บัตร · 19 อัตรา · 12 สิทธิพิเศษ (created_by = `seed-cards`) |
-
-```sql
-DELETE FROM card_perks        WHERE created_by = 'seed-cards';
-DELETE FROM card_base_benefit WHERE created_by = 'seed-cards';
-DELETE FROM point_programs    WHERE created_by = 'seed-cards';
--- credit_cards ที่ seed สร้าง (KTC/AEON) ก็ created_by = 'seed-cards' เช่นกัน
--- แต่ KBANK/UOB เป็นแถวเดิมที่ถูก update ทับ — ตรวจก่อนลบ
-
-DELETE FROM promotion_merchants;
-DELETE FROM promotions;
-DELETE FROM merchants;
-DELETE FROM categories;
-```
-
-> ทุกแถวที่ seed-cards สร้างมี `created_by = 'seed-cards'` เพื่อให้แยกออกจากข้อมูลจริงได้ตอนล้าง
+> ⚠️ **บล็อก SQL เดิมตรงนี้อันตราย ลบทิ้งแล้ว** — มันมี `DELETE FROM merchants` กับ `DELETE FROM categories` ซึ่งจะลบข้อมูลจริง **188 ร้าน** และ **16 หมวด** ทิ้ง · `prisma/seed.ts` ไม่เคยรันกับ DB ตัวนี้ ตัวเลข "12 merchants · 6 categories" ในบล็อกเดิมเป็นตัวเลขจาก script ไม่ใช่จาก DB
 
 ---
 
@@ -146,9 +128,21 @@ return (isMerchant ? 1000 : 0)
 
 **แก้ยังไง** — เพิ่ม `effective_rate_pct` เข้า `promotions` แล้วให้ `scorePromo` ใช้ค่านั้น (ดู `docs/data-model.md` เรื่องสูตร และ `docs/admin-portal.md` งาน 6.2)
 
-### 2. `promotions.max_cap` ไม่รู้ว่าต่ออะไร
+### 2. ~~`promotions.max_cap` ไม่รู้ว่าต่ออะไร~~ — ✅ แก้แล้ว 2026-08-26
 
-ไม่มี `cap_period` — "฿1,000 ต่อรอบบิล" กับ "ต่อปี" ต่างกันมากแต่เก็บเหมือนกัน · `card_base_benefit` ที่ออกแบบใหม่มี `cap_period` แล้ว ควรเติมย้อนกลับมาที่ `promotions`
+`005` เพิ่ม `cap_period` (`per_bill`/`per_month`/`per_year`) · `cap_basis` (`reward`/`spend`) · `max_cap_campaign` (เพดานชั้นสอง) ครบแล้ว
+
+**เหลือ constraint ตัวเดียวที่ยังเป็น `NOT VALID`** — ยืนยันกับ DB 2026-09-05
+
+```
+⚠️  NOT VALID  promo_cap_needs_period
+```
+
+ตั้งใจ — แถว `promotions` เดิมไม่มีทางรู้ว่า `max_cap` หมายถึงอะไร การเดาให้มันเพื่อให้ migration ผ่านคือการสร้างข้อมูลปลอมที่ดูน่าเชื่อถือ · `NOT VALID` บังคับกับแถวใหม่ทุกแถว แต่ยกเว้นแถวเก่า · พอกรอกครบแล้วรัน:
+
+```sql
+ALTER TABLE public.promotions VALIDATE CONSTRAINT promo_cap_needs_period;
+```
 
 ### 3. ~~`promotion_cards` กำกวม~~ — ✅ แก้แล้ว 2026-08-07
 
@@ -158,26 +152,39 @@ return (isMerchant ? 1000 : 0)
 
 ### 4. Seed data ปลอมยังอยู่ใน DB
 
-ข้อมูลสมมติมาจาก **สอง** script ที่รันไปแล้ว ต้องล้างก่อนใส่ข้อมูลจริงจากธนาคาร
+**ยืนยันกับ DB จริง 2026-09-05** — นับแถวจริงแล้ว ไม่ใช่ตัวเลขจาก script
 
-| script | สร้างอะไร | `created_by` |
+| ตาราง | seed สร้าง | ของจริง |
 |---|---|---|
-| `prisma/seed-cards.ts` | 4 point_programs · 8 บัตร · 19 อัตรา · 12 สิทธิพิเศษ | `seed-cards` |
-| `prisma/seed-promos.ts` | 8 โปร (all_bank 4 · specific_cards 4) + ผูกร้าน/บัตร | `seed-promos` |
+| `point_programs` | 4 (`seed-cards`) | 0 |
+| `card_base_benefit` | 19 (`seed-cards`) | 0 |
+| `card_perks` | 12 (`seed-cards`) | 0 |
+| `promotions` | 8 (`seed-promos`) | 0 |
+| `credit_cards` | 4 สร้างใหม่ + **4 ทับของเดิม** | 18 |
+
+#### ⚠️ `credit_cards` 4 ใบที่ถูก **update ทับ** — ห้าม DELETE
+
+`seed-cards.ts` หาใบเดิมก่อน ถ้าเจอจะ `update` ไม่ใช่ `create` ([seed-cards.ts:222](../prisma/seed-cards.ts#L222)) → แถวพวกนี้ **`created_by` ยังเป็น NULL** แต่ `updated_by = 'seed-cards'`
+
+| ถูกทับ (ต้อง restore ค่า ไม่ใช่ลบ) | สร้างใหม่ (ลบได้) |
+|---|---|
+| KBank Cashback · KBank Platinum | KTC Cash Back Platinum · KTC FOREVER Platinum |
+| UOB Absolute Cashback · UOB PRVI Miles | AEON Cashback · AEON Royal Orchid Plus |
 
 ```sql
-DELETE FROM promotions        WHERE created_by = 'seed-promos';  -- cascade ลบ promotion_cards/_merchants
+-- ลบเฉพาะที่ seed สร้างเอง
+DELETE FROM promotions        WHERE created_by = 'seed-promos';  -- cascade promotion_cards/_merchants
 DELETE FROM card_perks        WHERE created_by = 'seed-cards';
 DELETE FROM card_base_benefit WHERE created_by = 'seed-cards';
 DELETE FROM point_programs    WHERE created_by = 'seed-cards';
--- credit_cards: KTC/AEON สร้างใหม่ (created_by='seed-cards')
---               KBANK/UOB เป็นแถวเดิมที่ถูก update ทับ — ตรวจก่อนลบ
+DELETE FROM credit_cards      WHERE created_by = 'seed-cards';
+
+-- 4 ใบที่ถูกทับ — ดูก่อนว่าค่าไหนเพี้ยน แล้วแก้ทีละใบ
+SELECT card_name, bank_id, updated_by FROM credit_cards
+ WHERE created_by IS NULL AND updated_by = 'seed-cards';
 ```
 
-> ทุกแถวมี `created_by` กำกับเพื่อให้แยกออกจากข้อมูลจริงได้ตอนล้าง
-
-**หมายเหตุ:** `prisma/seed.ts` (6 categories · 12 merchants · 20 promotions) **ไม่เคยรันกับ DB ตัวนี้** — `merchants` 188 แถวและ `categories` 16 แถวที่มีอยู่มาจากทางอื่นและดูเหมือนข้อมูลจริง อย่าเผลอรัน `seed.ts` ทับ
-
+> **ห้ามแตะ `merchants` (188) และ `categories` (16)** — เป็นข้อมูลจริง `prisma/seed.ts` ไม่เคยรันกับ DB ตัวนี้ · อย่าเผลอรัน `seed.ts` ทับ
 ---
 
 ## 🟡 เอกสารไม่ตรงกับโค้ด
@@ -205,9 +212,9 @@ DELETE FROM point_programs    WHERE created_by = 'seed-cards';
 
 ### 1. LIFF auth ซ้ำทุกหน้า — ควรย้ายไป Context
 
-**สถานะ:** ยังไม่ทำ · ปัญหาโตขึ้นเรื่อย ๆ (ตอนนี้ 4 หน้า)
+**สถานะ:** ยังไม่ทำ · ปัญหาโตขึ้นเรื่อย ๆ (**6 หน้า** แล้ว — ยืนยัน 2026-09-05)
 
-ทุกหน้าเรียก `initLiff()` + `signInWithLine()` แยกกันเอง → LIFF init ถูกเรียกซ้ำ · auth logic ซ้ำซ้อน · เพิ่มหน้าใหม่ต้อง copy-paste ทุกครั้ง (ซึ่งเป็นสาเหตุที่ hardcode dev user id ลามจาก 2 เป็น 4 ไฟล์)
+ทุกหน้าเรียก `initLiff()` + `signInWithLine()` แยกกันเอง → LIFF init ถูกเรียกซ้ำ · auth logic ซ้ำซ้อน · เพิ่มหน้าใหม่ต้อง copy-paste ทุกครั้ง (ซึ่งเป็นสาเหตุที่ hardcode dev user id ลามจาก 2 เป็น 5 ไฟล์)
 
 **แก้ยังไง** — สร้าง `contexts/LiffContext.tsx` → ย้าย init + auth ไป `app/(liff)/layout.tsx` → ทุกหน้าใช้ `useLiff()`
 
@@ -231,9 +238,13 @@ Fuse.js โหลด merchants ทั้งหมดเข้า memory ทุ�
 
 **Design decision ที่ตกลงไว้แล้ว** — หน้านี้คือ *browse บางส่วน* ไม่ใช่ที่ไว้นับแต้มทีละแถว · ยอดสะสมให้ทำเป็น server aggregate (`SUM`) แยกต่างหาก · window ต้องตัดที่**ขอบเดือน**เสมอ ห้ามตัดตามจำนวนแถว ไม่งั้น subtotal เดือนขอบเพี้ยน
 
-### 4. `credit_cards` ขาดฟิลด์
+### 4. `credit_cards` ขาดฟิลด์ — ✅ ปิดไปแล้วครึ่งหนึ่ง
 
-`network` (VISA/Master/JCB — AddCardWizard ในดีไซน์มี NetworkPicker แต่ไม่มีที่เก็บ) · `annual_fee` · `interest_rate`
+`network` · `annual_fee` **มีคอลัมน์แล้ว** (`005`) · เหลือ `interest_rate` ที่ยังไม่มี
+
+**แต่ที่ยังพังคือฝั่ง UI** — `AddCardWizard` มี NetworkPicker ให้ user เลือกเครือข่าย แล้ว**โยนทิ้ง** เพราะ `POST /api/cards/my` ไม่รับฟิลด์นี้ ([route.ts:39](../app/api/cards/my/route.ts#L39) รับแค่ `cardId` · `last_four` · `credit_limit` · รอบบิล)
+
+ตามการตัดสินใจข้อ 14 `network` เป็นของ `credit_cards` ที่ทีมงาน curate ไม่ใช่ของ `users_card` → ทางแก้คือทำ picker เป็น **read-only** เมื่อเลือกบัตรจากแคตตาล็อก ไม่ใช่เปิดให้ API รับค่าจาก user
 
 ---
 
