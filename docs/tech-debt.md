@@ -80,24 +80,23 @@ const user = await prisma.users.upsert({ where: { line_id: String(userId) }, ...
 
 ---
 
-### 5. `/admin` เข้าถึงได้จากภายนอกทุกครั้งที่รัน `dev:tunnel`
+### 5. ~~`/admin` เข้าถึงได้จากภายนอกทุกครั้งที่รัน `dev:tunnel`~~ — ✅ แก้แล้ว 2026-09-06
 
-**สถานะ:** ยังไม่ได้ใส่ตัวกัน
+`isAdminReachable()` ใน [middleware.ts](../middleware.ts) ตอบ **404** กับ `/admin*` และ `/api/admin*` เมื่อ Host ไม่ใช่ localhost และไม่ได้ตั้ง `ENABLE_ADMIN=true` (8 tests ที่ [middleware.test.ts](../middleware.test.ts))
 
-`npm run dev:tunnel` เปิด ngrok ด้วย **domain ตายตัว** (`padded-celtic-retouch.ngrok-free.dev`) ซึ่งชี้มาที่ `next dev` ตัวเดียวกับที่มี `/admin` อยู่ — ทุกครั้งที่รัน tunnel เพื่อเทส LIFF หน้า admin ก็เปิดสู่อินเทอร์เน็ตไปด้วย และต่อกับ **Supabase ตัวจริง**
+| ที่ไหน | `ENABLE_ADMIN` | ผล |
+|---|---|---|
+| local dev | ไม่ต้องตั้ง | เข้าได้ (host เป็น localhost) |
+| `dev:tunnel` (ngrok) | ไม่ตั้ง | **404** |
+| Vercel preview | ไม่ตั้ง | **404** |
+| Vercel production | `true` | เข้าได้ แล้วเจอหน้า login |
 
-ตอนนี้พึ่งรหัสผ่าน + account lockout (ข้อ 6) เป็นด่านเดียว
+**สองอย่างที่ต้องไม่แก้กลับ**
 
-**ทางแก้ที่คุยกันไว้** — ให้ middleware ตอบ 404 กับ `/admin*` เมื่อ Host ไม่ใช่ localhost และไม่ได้ตั้ง `ENABLE_ADMIN=true`
+- **404 มาก่อนข้อยกเว้นหน้า login** — ถ้าสลับลำดับ `/admin/login` จะยังโผล่จากข้างนอก ซึ่งเท่ากับประกาศว่าโดเมนนี้มี admin portal · มีเทสจับไว้แล้ว
+- **ห้ามเปลี่ยนไปเช็ก `NODE_ENV === 'development'`** — `dev:tunnel` ก็รัน `next dev` เหมือนกัน เช็ก NODE_ENV แล้วจะปล่อยผ่านเคสที่ตั้งใจกันพอดี
 
-```ts
-const host = req.headers.get('host') ?? ''
-const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1')
-if (!isLocal && process.env.ENABLE_ADMIN !== 'true') return new NextResponse(null, { status: 404 })
-```
-
-> เป็น**ตัวกันพลาด ไม่ใช่กำแพง** — Host header เป็นสิ่งที่ client ส่งมาเอง ปลอมได้ · กำแพงจริงคือรหัสผ่านกับ lockout
-> ใช้ flag ตัวเดียวกันคุมตอน deploy Vercel ได้ด้วย (production เปิด · preview ปิด)
+> ยังเป็น**ตัวกันพลาด ไม่ใช่กำแพง** — Host header client ส่งมาเอง ปลอมได้ · กำแพงจริงยังคือรหัสผ่านกับ lockout (ข้อ 6) · ที่มันกันคือการเปิดโดยไม่ได้ตั้งใจ ไม่ใช่คนที่ตั้งใจเจาะ
 
 > **หมายเหตุ:** `MIN_PASSWORD_LENGTH` ลดจาก 12 เหลือ **8** ตาม NIST SP 800-63B — ตัวเลข 12 เดิมตั้งขึ้นเองไม่ได้อ้างมาตรฐานไหน
 

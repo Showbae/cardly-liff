@@ -106,6 +106,9 @@ LINE_CHANNEL_SECRET=
 
 # App
 NEXT_PUBLIC_APP_URL=
+
+# Admin Portal
+ENABLE_ADMIN=                     # 'true' เท่านั้นที่เปิด /admin จากโดเมนที่ไม่ใช่ localhost
 ```
 
 > **Note**: Never commit `.env.local` to version control. All `NEXT_PUBLIC_` variables are exposed to the browser.
