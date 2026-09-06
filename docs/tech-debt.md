@@ -111,6 +111,33 @@ const user = await prisma.users.upsert({ where: { line_id: String(userId) }, ...
 
 ---
 
+### 7. LINE bot ออนไลน์เฉพาะตอนเปิดเครื่อง — webhook ชี้ที่ ngrok
+
+**สถานะ:** ตั้งใจเลือกไว้แบบนี้ (ยืนยัน 2026-09-06) · ไม่ใช่การลืมตั้งค่า
+
+webhook ที่ลงทะเบียนไว้กับ LINE ชี้มาที่ tunnel ของเครื่อง dev:
+
+```
+GET https://api.line.me/v2/bot/channel/webhook/endpoint
+{ "endpoint": "https://padded-celtic-retouch.ngrok-free.dev/api/webhook", "active": true }
+```
+
+→ บอททำงานเฉพาะตอนรัน `npm run dev:tunnel` · ปิด terminal เมื่อไหร่บอทตายทันที · LINE ไม่เคยส่ง event ไปที่ `cardly-liff.vercel.app` เลยสักครั้ง
+
+#### ⚠️ อย่า "แก้" ให้โดยไม่ได้คุยกันก่อน
+
+`LINE_CHANNEL_SECRET` กับ `LINE_CHANNEL_ACCESS_TOKEN` **ไม่ได้ตั้งไว้บน Vercel** — เห็นแล้วจะดูเหมือนลืม แต่มันถูกต้องแล้วตามการตัดสินใจนี้ ยังไม่มีอะไรบน production ที่ต้องใช้มัน (ค่าอยู่ครบใน `.env.local` และ token ยังใช้ได้ — ตรวจกับ `/v2/bot/info` แล้ว)
+
+**เหตุผลที่เลือก** — LINE channel หนึ่งตัวตั้ง webhook ได้ URL เดียว · ย้ายไป production แล้วจะเทสในเครื่องไม่ได้อีก ต้องสลับ URL ไปมาทุกครั้ง · ตอนนี้ยังไม่มีผู้ใช้จริง ความสะดวกตอน dev มีค่ากว่า uptime
+
+**เงื่อนไขที่ยอมไม่ได้อีกต่อไป:** ก่อน onboard beta tester คนแรก — บอทที่ออนไลน์เฉพาะตอนเจ้าของเปิดคอมใช้รับ user จริงไม่ได้
+
+**ทางแก้ตอนนั้น** — สร้าง **LINE channel ที่สองสำหรับ dev** แล้วให้ channel เดิมชี้ production ถาวร (ไม่ใช่สลับ URL ไปมา) · ตอนนั้นค่อยตั้ง `LINE_CHANNEL_*` บน Vercel แล้ว `vercel --prod`
+
+> เกี่ยวกับข้อ 5 — `dev:tunnel` ไม่ใช่ของที่นาน ๆ รันที แต่เป็น**ทางเดียวที่บอททำงาน** จึงถูกรันบ่อยมาก · ทุกครั้งที่บอทออนไลน์ = `/admin` เคยออนไลน์ไปด้วย ก่อนจะมี guard ในข้อ 5
+
+---
+
 ## 🟠 ความถูกต้องของข้อมูล
 
 ### 1. `scorePromo` บวก `benefit_value` ข้ามหน่วย
